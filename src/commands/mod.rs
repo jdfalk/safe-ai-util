@@ -17,9 +17,10 @@ pub mod system;
 use crate::executor::Executor;
 use anyhow::Result;
 use clap::ArgMatches;
+use std::future::Future;
 
 /// Trait for command execution
 pub trait CommandExecutor {
     /// Execute the command with the given arguments and executor
-    async fn execute(matches: &ArgMatches, executor: &Executor) -> Result<()>;
+    fn execute(matches: &ArgMatches, executor: &Executor) -> impl Future<Output = Result<()>> + Send;
 }
