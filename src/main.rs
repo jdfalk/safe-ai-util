@@ -1,11 +1,11 @@
 // file: src/main.rs
-// version: 1.0.0
+// version: 2.0.0
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
 
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use copilot_agent_util::{
-    commands::{buf, file, git, linter, prettier, python, system},
+    commands::{awk, buf, editor, file, git, linter, prettier, python, sed, system},
     config::Config,
     executor::Executor,
     logger::setup_logging,
@@ -86,6 +86,9 @@ fn build_cli() -> Command {
         .subcommand(system::build_command())
         .subcommand(linter::build_command())
         .subcommand(prettier::build_command())
+        .subcommand(sed::build_command())
+        .subcommand(awk::build_command())
+        .subcommand(editor::build_command())
 }
 
 async fn execute_command(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -105,6 +108,9 @@ async fn execute_command(matches: &ArgMatches, executor: &Executor) -> Result<()
         Some(("system", sub_matches)) => system::execute(sub_matches, executor).await,
         Some(("linter", sub_matches)) => linter::execute(sub_matches, executor).await,
         Some(("prettier", sub_matches)) => prettier::execute(sub_matches, executor).await,
+        Some(("sed", sub_matches)) => sed::execute(sub_matches, executor).await,
+        Some(("awk", sub_matches)) => awk::execute(sub_matches, executor).await,
+        Some(("editor", sub_matches)) => editor::execute(sub_matches, executor).await,
         _ => {
             println!("No command specified. Use --help for usage information.");
             Ok(())

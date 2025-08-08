@@ -1,17 +1,20 @@
 // file: src/commands/mod.rs
-// version: 1.0.0
+// version: 2.0.0
 // guid: b3c95817-32f1-4e1c-8b34-78f6e85029dc
 
 //! Command module for the Copilot Agent Utility
 //!
 //! This module provides command execution functionality for various tools and operations.
 
+pub mod awk;
 pub mod buf;
+pub mod editor;
 pub mod file;
 pub mod git;
 pub mod linter;
 pub mod prettier;
 pub mod python;
+pub mod sed;
 pub mod system;
 
 use crate::executor::Executor;
