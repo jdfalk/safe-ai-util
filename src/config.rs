@@ -6,7 +6,7 @@ use crate::error::{AgentError, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,7 +155,7 @@ impl Config {
     }
 
     /// Merge two configurations, with the second taking precedence
-    fn merge_configs(mut base: Self, override_config: Self) -> Self {
+    fn merge_configs(_base: Self, override_config: Self) -> Self {
         // For now, just return the override config
         // In a full implementation, we'd merge each field intelligently
         override_config

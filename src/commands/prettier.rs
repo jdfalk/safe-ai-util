@@ -2,7 +2,8 @@
 // version: 1.0.0
 // guid: f3b23e72-ff46-4cdd-bba2-9f14cede3837
 
-use crate::{error::{AgentError, Result}, executor::Executor};
+use crate::executor::Executor;
+use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use tracing::{debug, info};
 

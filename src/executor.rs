@@ -2,10 +2,11 @@
 // version: 1.0.0
 // guid: bb371682-35cb-4f34-b318-8bf69ec125bd
 
-use crate::{config::Config, error::{AgentError, Result}};
+use crate::config::Config;
+use anyhow::{anyhow, Result};
 use std::process::Stdio;
 use tokio::process::Command;
-use tracing::{debug, error, info, warn};
+use tracing::info;
 
 /// Safe command executor with comprehensive error handling
 pub struct Executor {
@@ -21,7 +22,7 @@ impl Executor {
     /// Execute a raw command with arguments
     pub async fn execute_raw(&self, args: &[&str]) -> Result<()> {
         if args.is_empty() {
-            return Err(AgentError::invalid_argument("No command provided"));
+            return Err(anyhow!("No command provided"));
         }
 
         let command = args[0];
@@ -36,7 +37,7 @@ impl Executor {
 
         // Validate command exists
         if which::which(command).is_err() {
-            return Err(AgentError::execution(format!("Command not found: {}", command)));
+            return Err(anyhow!("Command not found: {}", command));
         }
 
         // Execute command
@@ -51,13 +52,13 @@ impl Executor {
         }
 
         let status = cmd.status().await
-            .map_err(|e| AgentError::execution(format!("Failed to execute command: {}", e)))?;
+            .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
 
         if !status.success() {
-            return Err(AgentError::execution(format!(
+            return Err(anyhow!(
                 "Command failed with exit code: {:?}",
                 status.code()
-            )));
+            ));
         }
 
         info!("Command executed successfully");

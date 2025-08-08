@@ -1,8 +1,10 @@
 // file: src/commands/mod.rs
 // version: 1.0.0
-// guid: 91287190-3d1a-4bda-b077-1342df3f7c09
+// guid: b3c95817-32f1-4e1c-8b34-78f6e85029dc
 
-//! Command implementations for the Copilot Agent Utility
+//! Command module for the Copilot Agent Utility
+//!
+//! This module provides command execution functionality for various tools and operations.
 
 pub mod buf;
 pub mod file;
@@ -12,7 +14,8 @@ pub mod prettier;
 pub mod python;
 pub mod system;
 
-use crate::{error::Result, executor::Executor};
+use crate::executor::Executor;
+use anyhow::Result;
 use clap::ArgMatches;
 
 /// Trait for command execution

@@ -2,9 +2,10 @@
 // version: 1.0.0
 // guid: fad7290a-3a19-4f89-a33c-15a68278800c
 
-use crate::{error::{AgentError, Result}, executor::Executor};
+use crate::executor::Executor;
+use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
-use tracing::{debug, info};
+use tracing::info;
 
 /// Build the buf command with comprehensive subcommands
 pub fn build_command() -> Command {
@@ -120,73 +121,87 @@ pub async fn execute(matches: &ArgMatches, executor: &Executor) -> Result<()> {
 }
 
 async fn execute_generate(matches: &ArgMatches, executor: &Executor) -> Result<()> {
-    let mut args = vec!["buf", "generate"];
+    let mut args = vec!["buf".to_string(), "generate".to_string()];
 
     if let Some(module) = matches.get_one::<String>("module") {
-        args.extend(&["--path", &format!("pkg/{}/proto", module)]);
+        args.push("--path".to_string());
+        args.push(format!("pkg/{}/proto", module));
     }
 
     if let Some(path) = matches.get_one::<String>("path") {
-        args.extend(&["--path", path]);
+        args.push("--path".to_string());
+        args.push(path.clone());
     }
 
     if let Some(output) = matches.get_one::<String>("output") {
-        args.extend(&["--output", output]);
+        args.push("--output".to_string());
+        args.push(output.clone());
     }
 
     info!("Generating protocol buffers with args: {:?}", args);
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
 
 async fn execute_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["buf", "lint", path];
+    let mut args = vec!["buf".to_string(), "lint".to_string(), path.clone()];
 
     if let Some(config) = matches.get_one::<String>("config") {
-        args.extend(&["--config", config]);
+        args.push("--config".to_string());
+        args.push(config.clone());
     }
 
     info!("Linting protocol buffers at path: {}", path);
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
 
 async fn execute_format(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["buf", "format"];
+    let mut args = vec!["buf".to_string(), "format".to_string(), path.clone()];
 
     if matches.get_flag("write") {
-        args.push("--write");
+        args.push("-w".to_string());
     }
 
-    args.push(path);
+    if let Some(config) = matches.get_one::<String>("config") {
+        args.push("--config".to_string());
+        args.push(config.clone());
+    }
 
     info!("Formatting protocol buffers at path: {}", path);
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
 
 async fn execute_breaking(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let against = matches.get_one::<String>("against").unwrap();
-    let args = vec!["buf", "breaking", "--against", against];
+    let args = vec!["buf".to_string(), "breaking".to_string(), "--against".to_string(), against.clone()];
 
     info!("Checking for breaking changes against: {}", against);
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
 
 async fn execute_build(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let args = vec!["buf", "build", path];
+    let args = vec!["buf".to_string(), "build".to_string(), path.clone()];
 
     info!("Building protocol buffers at path: {}", path);
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
 
 async fn execute_push(matches: &ArgMatches, executor: &Executor) -> Result<()> {
-    let mut args = vec!["buf", "push"];
+    let mut args = vec!["buf".to_string(), "push".to_string()];
 
     if let Some(tag) = matches.get_one::<String>("tag") {
-        args.extend(&["--tag", tag]);
+        args.push("--tag".to_string());
+        args.push(tag.clone());
     }
 
     info!("Pushing to Buf Schema Registry");
-    executor.execute_raw(&args).await
+    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    executor.execute_raw(&string_args).await
 }
