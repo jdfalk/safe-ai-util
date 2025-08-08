@@ -11,7 +11,9 @@ fn test_help_command() {
     cmd.arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Extremely safe centralized utility"));
+        .stdout(predicate::str::contains(
+            "Extremely safe centralized utility",
+        ));
 }
 
 #[test]

@@ -23,6 +23,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Build information
 pub const BUILD_INFO: &str = concat!(
-    "Version: ", env!("CARGO_PKG_VERSION"), "\n",
-    "Package: ", env!("CARGO_PKG_NAME"), "\n"
+    "Version: ",
+    env!("CARGO_PKG_VERSION"),
+    "\n",
+    "Package: ",
+    env!("CARGO_PKG_NAME"),
+    "\n"
 );

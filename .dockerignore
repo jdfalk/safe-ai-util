@@ -1,0 +1,57 @@
+# file: .dockerignore
+# version: 1.0.0
+# guid: 3c4d5e6f-7890-abcd-ef12-3456789abcde
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+*.yml
+*.yaml
+
+# Documentation
+README.md
+CHANGELOG.md
+TODO.md
+CONTRIBUTING.md
+LICENSE
+docs/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+bin/
+build/
+dist/
+
+# Scripts
+scripts/
+examples/
+benches/
+tests/
+
+# Temporary files
+*.tmp
+*.temp

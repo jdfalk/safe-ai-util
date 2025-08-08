@@ -1,67 +1,76 @@
-# Smart Dependabot configuration for ghcommon
-# Automatically detected: python, nodejs, github-actions
+# file: .github/dependabot.yml
+# version: 1.1.0
+# guid: 5e6f7890-abcd-ef12-3456-789abcdef012
 
+# Smart Dependabot configuration for Rust copilot-agent-util
 version: 2
 updates:
-- package-ecosystem: npm
-  directory: /
-  schedule:
-    interval: weekly
-    day: monday
-    time: 09:00
-    timezone: America/New_York
-  open-pull-requests-limit: 8
-  commit-message:
-    prefix: npm
-    include: scope
-  labels:
-  - dependencies
-  - priority-low
-  allow:
-  - dependency-type: direct
-  - dependency-type: indirect
-  ignore:
-  - dependency-name: '*'
-    update-types:
-    - version-update:semver-major
-  groups:
-    dev-dependencies:
-      patterns:
-      - '*eslint*'
-      - '*prettier*'
-      - '*commitlint*'
-      - '@types/*'
-      update-types:
-      - minor
-      - patch
-- package-ecosystem: pip
-  directory: /
-  schedule:
-    interval: weekly
-    day: tuesday
-    time: 09:00
-    timezone: America/New_York
-  open-pull-requests-limit: 3
-  commit-message:
-    prefix: python
-    include: scope
-  labels:
-  - dependencies
-  - priority-medium
-  allow:
-  - dependency-type: direct
-  - dependency-type: indirect
-- package-ecosystem: github-actions
-  directory: /
-  schedule:
-    interval: weekly
-    day: friday
-    time: 09:00
-    timezone: America/New_York
-  open-pull-requests-limit: 5
-  commit-message:
-    prefix: ci
-    include: scope
-  labels:
-  - dependencies
-  - priority-high
+  # Rust dependencies
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: 09:00
+      timezone: America/New_York
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: cargo
+      include: scope
+    labels:
+      - dependencies
+      - rust
+      - priority-medium
+    allow:
+      - dependency-type: all
+    groups:
+      rust-core:
+        patterns:
+          - "tokio*"
+          - "serde*"
+          - "clap*"
+          - "anyhow"
+          - "thiserror"
+      rust-dev:
+        patterns:
+          - "*dev*"
+          - "*test*"
+          - "*bench*"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: 09:00
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: actions
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+      - priority-high
+    allow:
+      - dependency-type: all
+
+  # Docker
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: 09:00
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: docker
+      include: scope
+    labels:
+      - dependencies
+      - docker
+      - priority-medium
+    allow:
+      - dependency-type: all

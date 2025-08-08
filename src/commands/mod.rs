@@ -22,5 +22,8 @@ use std::future::Future;
 /// Trait for command execution
 pub trait CommandExecutor {
     /// Execute the command with the given arguments and executor
-    fn execute(matches: &ArgMatches, executor: &Executor) -> impl Future<Output = Result<()>> + Send;
+    fn execute(
+        matches: &ArgMatches,
+        executor: &Executor,
+    ) -> impl Future<Output = Result<()>> + Send;
 }

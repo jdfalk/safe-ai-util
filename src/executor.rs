@@ -28,7 +28,10 @@ impl Executor {
         let command = args[0];
         let command_args = &args[1..];
 
-        info!("Executing command: {} with args: {:?}", command, command_args);
+        info!(
+            "Executing command: {} with args: {:?}",
+            command, command_args
+        );
 
         if self.config.safety.dry_run {
             println!("DRY RUN: Would execute: {} {:?}", command, command_args);
@@ -51,7 +54,9 @@ impl Executor {
             cmd.current_dir(wd);
         }
 
-        let status = cmd.status().await
+        let status = cmd
+            .status()
+            .await
             .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
 
         if !status.success() {

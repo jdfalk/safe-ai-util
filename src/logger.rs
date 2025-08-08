@@ -11,10 +11,7 @@ pub fn setup_logging() -> Result<()> {
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
 
-    fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
+    fmt().with_env_filter(filter).with_target(false).init();
 
     Ok(())
 }

@@ -19,22 +19,22 @@ pub fn build_command() -> Command {
                         .long("module")
                         .short('m')
                         .value_name("MODULE")
-                        .help("Generate for specific module")
+                        .help("Generate for specific module"),
                 )
                 .arg(
                     Arg::new("path")
                         .long("path")
                         .short('p')
                         .value_name("PATH")
-                        .help("Path to protocol buffer files")
+                        .help("Path to protocol buffer files"),
                 )
                 .arg(
                     Arg::new("output")
                         .long("output")
                         .short('o')
                         .value_name("OUTPUT_DIR")
-                        .help("Output directory for generated code")
-                )
+                        .help("Output directory for generated code"),
+                ),
         )
         .subcommand(
             Command::new("lint")
@@ -43,15 +43,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("config")
                         .long("config")
                         .short('c')
                         .value_name("CONFIG_FILE")
-                        .help("Path to buf configuration file")
-                )
+                        .help("Path to buf configuration file"),
+                ),
         )
         .subcommand(
             Command::new("format")
@@ -60,15 +60,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write formatted output to files")
-                )
+                        .help("Write formatted output to files"),
+                ),
         )
         .subcommand(
             Command::new("breaking")
@@ -78,8 +78,8 @@ pub fn build_command() -> Command {
                         .long("against")
                         .value_name("REF")
                         .help("Git reference to compare against")
-                        .default_value("main")
-                )
+                        .default_value("main"),
+                ),
         )
         .subcommand(
             Command::new("build")
@@ -88,8 +88,8 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to build (defaults to current directory)")
-                        .default_value(".")
-                )
+                        .default_value("."),
+                ),
         )
         .subcommand(
             Command::new("push")
@@ -99,8 +99,8 @@ pub fn build_command() -> Command {
                         .long("tag")
                         .short('t')
                         .value_name("TAG")
-                        .help("Tag for the push")
-                )
+                        .help("Tag for the push"),
+                ),
         )
 }
 
@@ -177,7 +177,12 @@ async fn execute_format(matches: &ArgMatches, executor: &Executor) -> Result<()>
 
 async fn execute_breaking(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let against = matches.get_one::<String>("against").unwrap();
-    let args = vec!["buf".to_string(), "breaking".to_string(), "--against".to_string(), against.clone()];
+    let args = vec![
+        "buf".to_string(),
+        "breaking".to_string(),
+        "--against".to_string(),
+        against.clone(),
+    ];
 
     info!("Checking for breaking changes against: {}", against);
     let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();

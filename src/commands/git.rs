@@ -8,9 +8,8 @@ use clap::{ArgMatches, Command};
 
 /// Build the git command
 pub fn build_command() -> Command {
-    Command::new("git")
-        .about("Git operations")
-        // Add subcommands here
+    Command::new("git").about("Git operations")
+    // Add subcommands here
 }
 
 /// Execute git commands

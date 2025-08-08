@@ -127,7 +127,10 @@ impl Config {
         // Try to load from project config
         let project_config = Path::new(".copilot-agent-util.toml");
         if project_config.exists() {
-            info!("Loading project configuration from: {}", project_config.display());
+            info!(
+                "Loading project configuration from: {}",
+                project_config.display()
+            );
             let project_config = Self::load_from_file(project_config).await?;
             config = Self::merge_configs(config, project_config);
         }
@@ -146,12 +149,21 @@ impl Config {
 
     /// Load configuration from a TOML file
     async fn load_from_file(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path)
-            .await
-            .map_err(|e| AgentError::config(format!("Failed to read config file {}: {}", path.display(), e)))?;
+        let content = fs::read_to_string(path).await.map_err(|e| {
+            AgentError::config(format!(
+                "Failed to read config file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
 
-        toml::from_str(&content)
-            .map_err(|e| AgentError::config(format!("Failed to parse config file {}: {}", path.display(), e)))
+        toml::from_str(&content).map_err(|e| {
+            AgentError::config(format!(
+                "Failed to parse config file {}: {}",
+                path.display(),
+                e
+            ))
+        })
     }
 
     /// Merge two configurations, with the second taking precedence

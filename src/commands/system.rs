@@ -8,9 +8,8 @@ use clap::{ArgMatches, Command};
 
 /// Build the system command
 pub fn build_command() -> Command {
-    Command::new("system")
-        .about("System operations")
-        // Add subcommands here
+    Command::new("system").about("System operations")
+    // Add subcommands here
 }
 
 /// Execute system commands

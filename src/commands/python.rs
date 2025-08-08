@@ -8,9 +8,8 @@ use clap::{ArgMatches, Command};
 
 /// Build the python command
 pub fn build_command() -> Command {
-    Command::new("python")
-        .about("Python operations")
-        // Add subcommands here
+    Command::new("python").about("Python operations")
+    // Add subcommands here
 }
 
 /// Execute python commands

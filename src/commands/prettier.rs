@@ -18,28 +18,28 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write formatted output to files")
+                        .help("Write formatted output to files"),
                 )
                 .arg(
                     Arg::new("check")
                         .long("check")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Check if files are formatted")
+                        .help("Check if files are formatted"),
                 )
                 .arg(
                     Arg::new("config")
                         .long("config")
                         .short('c')
                         .value_name("CONFIG_FILE")
-                        .help("Path to Prettier configuration file")
-                )
+                        .help("Path to Prettier configuration file"),
+                ),
         )
         .subcommand(
             Command::new("black")
@@ -48,13 +48,13 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("check")
                         .long("check")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Don't write back, just check")
+                        .help("Don't write back, just check"),
                 )
                 .arg(
                     Arg::new("line-length")
@@ -62,8 +62,8 @@ pub fn build_command() -> Command {
                         .short('l')
                         .value_name("LENGTH")
                         .help("Line length")
-                        .default_value("88")
-                )
+                        .default_value("88"),
+                ),
         )
         .subcommand(
             Command::new("isort")
@@ -72,37 +72,28 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("check")
                         .long("check")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Check import sorting without making changes")
+                        .help("Check import sorting without making changes"),
                 )
                 .arg(
                     Arg::new("diff")
                         .long("diff")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Show diff of changes")
-                )
+                        .help("Show diff of changes"),
+                ),
         )
         .subcommand(
-            Command::new("rustfmt")
-                .about("Format Rust code")
-                .arg(
-                    Arg::new("check")
-                        .long("check")
-                        .action(clap::ArgAction::SetTrue)
-                        .help("Check formatting without making changes")
-                )
-                .arg(
-                    Arg::new("edition")
-                        .long("edition")
-                        .value_name("EDITION")
-                        .help("Rust edition (2015, 2018, 2021)")
-                        .default_value("2021")
-                )
+            Command::new("rustfmt").about("Format Rust code").arg(
+                Arg::new("check")
+                    .long("check")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Check formatting without making changes"),
+            ),
         )
         .subcommand(
             Command::new("gofmt")
@@ -111,22 +102,22 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write result to file instead of stdout")
+                        .help("Write result to file instead of stdout"),
                 )
                 .arg(
                     Arg::new("diff")
                         .long("diff")
                         .short('d')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Display diffs instead of rewriting files")
-                )
+                        .help("Display diffs instead of rewriting files"),
+                ),
         )
         .subcommand(
             Command::new("goimports")
@@ -135,15 +126,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write result to file instead of stdout")
-                )
+                        .help("Write result to file instead of stdout"),
+                ),
         )
         .subcommand(
             Command::new("buf-format")
@@ -152,15 +143,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write formatted output to files")
-                )
+                        .help("Write formatted output to files"),
+                ),
         )
         .subcommand(
             Command::new("shfmt")
@@ -169,14 +160,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to shell scripts")
-                        .required(true)
+                        .required(true),
                 )
                 .arg(
                     Arg::new("write")
                         .long("write")
                         .short('w')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Write result to file instead of stdout")
+                        .help("Write result to file instead of stdout"),
                 )
                 .arg(
                     Arg::new("indent")
@@ -184,8 +175,8 @@ pub fn build_command() -> Command {
                         .short('i')
                         .value_name("SIZE")
                         .help("Indent size")
-                        .default_value("2")
-                )
+                        .default_value("2"),
+                ),
         )
         .subcommand(
             Command::new("clang-format")
@@ -194,22 +185,22 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format")
-                        .required(true)
+                        .required(true),
                 )
                 .arg(
                     Arg::new("in-place")
                         .long("in-place")
                         .short('i')
                         .action(clap::ArgAction::SetTrue)
-                        .help("Format files in place")
+                        .help("Format files in place"),
                 )
                 .arg(
                     Arg::new("style")
                         .long("style")
                         .value_name("STYLE")
                         .help("Coding style (LLVM, Google, Chromium, Mozilla, WebKit)")
-                        .default_value("Google")
-                )
+                        .default_value("Google"),
+                ),
         )
         .subcommand(
             Command::new("yaml-format")
@@ -218,7 +209,7 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to YAML files")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("indent")
@@ -226,8 +217,8 @@ pub fn build_command() -> Command {
                         .short('i')
                         .value_name("SIZE")
                         .help("Indent size")
-                        .default_value("2")
-                )
+                        .default_value("2"),
+                ),
         )
         .subcommand(
             Command::new("json-format")
@@ -236,7 +227,7 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to JSON files")
-                        .required(true)
+                        .required(true),
                 )
                 .arg(
                     Arg::new("indent")
@@ -244,8 +235,8 @@ pub fn build_command() -> Command {
                         .short('i')
                         .value_name("SIZE")
                         .help("Indent size")
-                        .default_value("2")
-                )
+                        .default_value("2"),
+                ),
         )
         .subcommand(
             Command::new("all")
@@ -254,14 +245,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to format (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("check")
                         .long("check")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Check formatting without making changes")
-                )
+                        .help("Check formatting without making changes"),
+                ),
         )
 }
 
@@ -281,7 +272,9 @@ pub async fn execute(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         Some(("json-format", sub_matches)) => execute_json_format(sub_matches, executor).await,
         Some(("all", sub_matches)) => execute_all_formatters(sub_matches, executor).await,
         _ => {
-            println!("No prettier subcommand specified. Use 'prettier --help' for usage information.");
+            println!(
+                "No prettier subcommand specified. Use 'prettier --help' for usage information."
+            );
             Ok(())
         }
     }
@@ -343,8 +336,7 @@ async fn execute_isort(matches: &ArgMatches, executor: &Executor) -> Result<()> 
 }
 
 async fn execute_rustfmt(matches: &ArgMatches, executor: &Executor) -> Result<()> {
-    let edition = matches.get_one::<String>("edition").unwrap();
-    let mut args = vec!["cargo", "fmt", "--", "--edition", edition];
+    let mut args = vec!["cargo", "fmt"];
 
     if matches.get_flag("check") {
         args.push("--check");
@@ -460,12 +452,47 @@ async fn execute_all_formatters(matches: &ArgMatches, executor: &Executor) -> Re
 
     // Run formatters based on detected file types
     let formatters = vec![
-        ("prettier", if check { vec!["prettier", ".", "--check"] } else { vec!["prettier", ".", "--write"] }),
-        ("black", if check { vec!["black", ".", "--check"] } else { vec!["black", "."] }),
-        ("isort", if check { vec!["isort", ".", "--check-only"] } else { vec!["isort", "."] }),
-        ("rustfmt", if check { vec!["cargo", "fmt", "--", "--check"] } else { vec!["cargo", "fmt"] }),
+        (
+            "prettier",
+            if check {
+                vec!["prettier", ".", "--check"]
+            } else {
+                vec!["prettier", ".", "--write"]
+            },
+        ),
+        (
+            "black",
+            if check {
+                vec!["black", ".", "--check"]
+            } else {
+                vec!["black", "."]
+            },
+        ),
+        (
+            "isort",
+            if check {
+                vec!["isort", ".", "--check-only"]
+            } else {
+                vec!["isort", "."]
+            },
+        ),
+        (
+            "rustfmt",
+            if check {
+                vec!["cargo", "fmt", "--", "--check"]
+            } else {
+                vec!["cargo", "fmt"]
+            },
+        ),
         ("gofmt", vec!["gofmt", "-w", "."]),
-        ("buf format", if check { vec!["buf", "format", "."] } else { vec!["buf", "format", "--write", "."] }),
+        (
+            "buf format",
+            if check {
+                vec!["buf", "format", "."]
+            } else {
+                vec!["buf", "format", "--write", "."]
+            },
+        ),
     ];
 
     for (name, args) in formatters {

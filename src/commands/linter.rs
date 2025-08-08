@@ -18,15 +18,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("config")
                         .long("config")
                         .short('c')
                         .value_name("CONFIG_FILE")
-                        .help("Path to buf configuration file")
-                )
+                        .help("Path to buf configuration file"),
+                ),
         )
         .subcommand(
             Command::new("eslint")
@@ -35,21 +35,21 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("fix")
                         .long("fix")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Automatically fix problems")
+                        .help("Automatically fix problems"),
                 )
                 .arg(
                     Arg::new("config")
                         .long("config")
                         .short('c')
                         .value_name("CONFIG_FILE")
-                        .help("Path to ESLint configuration file")
-                )
+                        .help("Path to ESLint configuration file"),
+                ),
         )
         .subcommand(
             Command::new("flake8")
@@ -58,15 +58,15 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("max-line-length")
                         .long("max-line-length")
                         .value_name("LENGTH")
                         .help("Maximum line length")
-                        .default_value("88")
-                )
+                        .default_value("88"),
+                ),
         )
         .subcommand(
             Command::new("mypy")
@@ -75,14 +75,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to type check (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("strict")
                         .long("strict")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Enable strict mode")
-                )
+                        .help("Enable strict mode"),
+                ),
         )
         .subcommand(
             Command::new("clippy")
@@ -91,14 +91,14 @@ pub fn build_command() -> Command {
                     Arg::new("all-targets")
                         .long("all-targets")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Check all targets")
+                        .help("Check all targets"),
                 )
                 .arg(
                     Arg::new("all-features")
                         .long("all-features")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Check with all features enabled")
-                )
+                        .help("Check with all features enabled"),
+                ),
         )
         .subcommand(
             Command::new("golangci-lint")
@@ -107,14 +107,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("fix")
                         .long("fix")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Fix issues automatically")
-                )
+                        .help("Fix issues automatically"),
+                ),
         )
         .subcommand(
             Command::new("shellcheck")
@@ -123,7 +123,7 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to shell scripts")
-                        .required(true)
+                        .required(true),
                 )
                 .arg(
                     Arg::new("format")
@@ -131,8 +131,8 @@ pub fn build_command() -> Command {
                         .short('f')
                         .value_name("FORMAT")
                         .help("Output format (checkstyle, diff, gcc, json, json1, quiet, tty)")
-                        .default_value("tty")
-                )
+                        .default_value("tty"),
+                ),
         )
         .subcommand(
             Command::new("hadolint")
@@ -141,8 +141,8 @@ pub fn build_command() -> Command {
                     Arg::new("dockerfile")
                         .value_name("DOCKERFILE")
                         .help("Path to Dockerfile")
-                        .default_value("Dockerfile")
-                )
+                        .default_value("Dockerfile"),
+                ),
         )
         .subcommand(
             Command::new("yamllint")
@@ -151,14 +151,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to YAML files")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("strict")
                         .long("strict")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Return non-zero exit code on warnings")
-                )
+                        .help("Return non-zero exit code on warnings"),
+                ),
         )
         .subcommand(
             Command::new("markdownlint")
@@ -167,14 +167,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to Markdown files")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("fix")
                         .long("fix")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Fix issues automatically")
-                )
+                        .help("Fix issues automatically"),
+                ),
         )
         .subcommand(
             Command::new("all")
@@ -183,14 +183,14 @@ pub fn build_command() -> Command {
                     Arg::new("path")
                         .value_name("PATH")
                         .help("Path to lint (defaults to current directory)")
-                        .default_value(".")
+                        .default_value("."),
                 )
                 .arg(
                     Arg::new("fix")
                         .long("fix")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Fix issues automatically where possible")
-                )
+                        .help("Fix issues automatically where possible"),
+                ),
         )
 }
 
@@ -247,12 +247,7 @@ async fn execute_flake8(matches: &ArgMatches, executor: &Executor) -> Result<()>
     let path = matches.get_one::<String>("path").unwrap();
     let max_line_length = matches.get_one::<String>("max-line-length").unwrap();
 
-    let args = vec![
-        "flake8",
-        "--max-line-length",
-        max_line_length,
-        path
-    ];
+    let args = vec!["flake8", "--max-line-length", max_line_length, path];
 
     info!("Running flake8 on: {}", path);
     executor.execute_raw(&args).await
@@ -350,12 +345,36 @@ async fn execute_all_linters(matches: &ArgMatches, executor: &Executor) -> Resul
     // Check for different file types and run appropriate linters
     let linters = vec![
         ("buf", vec!["buf", "lint", "."]),
-        ("eslint", if fix { vec!["eslint", ".", "--fix"] } else { vec!["eslint", "."] }),
+        (
+            "eslint",
+            if fix {
+                vec!["eslint", ".", "--fix"]
+            } else {
+                vec!["eslint", "."]
+            },
+        ),
         ("flake8", vec!["flake8", "."]),
-        ("clippy", vec!["cargo", "clippy", "--all-targets", "--", "-D", "warnings"]),
-        ("golangci-lint", if fix { vec!["golangci-lint", "run", ".", "--fix"] } else { vec!["golangci-lint", "run", "."] }),
+        (
+            "clippy",
+            vec!["cargo", "clippy", "--all-targets", "--", "-D", "warnings"],
+        ),
+        (
+            "golangci-lint",
+            if fix {
+                vec!["golangci-lint", "run", ".", "--fix"]
+            } else {
+                vec!["golangci-lint", "run", "."]
+            },
+        ),
         ("yamllint", vec!["yamllint", "."]),
-        ("markdownlint", if fix { vec!["markdownlint", ".", "--fix"] } else { vec!["markdownlint", "."] }),
+        (
+            "markdownlint",
+            if fix {
+                vec!["markdownlint", ".", "--fix"]
+            } else {
+                vec!["markdownlint", "."]
+            },
+        ),
     ];
 
     for (name, args) in linters {

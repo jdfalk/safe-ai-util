@@ -8,9 +8,8 @@ use clap::{ArgMatches, Command};
 
 /// Build the file command
 pub fn build_command() -> Command {
-    Command::new("file")
-        .about("File operations")
-        // Add subcommands here
+    Command::new("file").about("File operations")
+    // Add subcommands here
 }
 
 /// Execute file commands
