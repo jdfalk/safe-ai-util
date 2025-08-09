@@ -1,11 +1,11 @@
 // file: src/main.rs
-// version: 2.0.0
+// version: 2.1.0
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
 
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use copilot_agent_util::{
-    commands::{awk, buf, editor, file, git, linter, prettier, python, sed, system},
+    commands::{awk, buf, editor, file, git, linter, prettier, python, sed, system, uutils},
     config::Config,
     executor::Executor,
     logger::setup_logging,
@@ -89,6 +89,7 @@ fn build_cli() -> Command {
         .subcommand(sed::build_command())
         .subcommand(awk::build_command())
         .subcommand(editor::build_command())
+        .subcommand(uutils::build_command())
 }
 
 async fn execute_command(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -111,6 +112,7 @@ async fn execute_command(matches: &ArgMatches, executor: &Executor) -> Result<()
         Some(("sed", sub_matches)) => sed::execute(sub_matches, executor).await,
         Some(("awk", sub_matches)) => awk::execute(sub_matches, executor).await,
         Some(("editor", sub_matches)) => editor::execute(sub_matches, executor).await,
+        Some(("uutils", sub_matches)) => uutils::execute(sub_matches, executor).await,
         _ => {
             println!("No command specified. Use --help for usage information.");
             Ok(())

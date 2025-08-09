@@ -110,12 +110,14 @@ struct AwkRule {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // Part of complete AWK implementation
 enum AwkPattern {
     Expression(String),
     Range(String, String),
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // Part of complete AWK implementation
 enum AwkAction {
     Block(Vec<AwkStatement>),
     Print(Option<String>),
@@ -123,6 +125,7 @@ enum AwkAction {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // Part of complete AWK implementation
 enum AwkStatement {
     Print(Option<String>),
     PrintF(String, Vec<String>),

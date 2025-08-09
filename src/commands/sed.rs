@@ -173,10 +173,11 @@ enum SedOperation {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Part of complete sed implementation
 struct SubstituteFlags {
     global: bool,
     print: bool,
-    write_to: Option<String>,
+    write_to: Option<String>, // For future 'w' flag support
     numeric: Option<usize>,
 }
 

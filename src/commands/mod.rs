@@ -16,6 +16,7 @@ pub mod prettier;
 pub mod python;
 pub mod sed;
 pub mod system;
+pub mod uutils;
 
 use crate::executor::Executor;
 use anyhow::Result;
