@@ -78,6 +78,7 @@ copilot-agent-util --verbose buf generate
 ## Command Categories
 
 ### File Operations
+
 - `file ls <path>` - List directory contents with safety checks
 - `file cat <file>` - Display file contents with encoding detection
 - `file cp <src> <dst>` - Copy files/directories with integrity verification
@@ -88,6 +89,7 @@ copilot-agent-util --verbose buf generate
 - `file grep <pattern> <path>` - Search within files with context
 
 ### Git Operations
+
 - `git add <pattern>` - Add files to staging with validation
 - `git commit -m <message>` - Commit changes with hooks support
 - `git push` - Push to remote with safety checks
@@ -100,6 +102,7 @@ copilot-agent-util --verbose buf generate
 - `git rebase <branch>` - Interactive rebase with safety guards
 
 ### Protocol Buffers
+
 - `buf generate` - Generate all protocol buffers with validation
 - `buf generate --module <name>` - Generate specific module safely
 - `buf lint` - Lint protocol buffer files with detailed reports
@@ -107,6 +110,7 @@ copilot-agent-util --verbose buf generate
 - `buf breaking` - Check for breaking changes with impact analysis
 
 ### Development Tools
+
 - `python run <script>` - Run Python scripts with environment isolation
 - `python build` - Build Python projects with dependency checking
 - `python test` - Run Python tests with coverage reporting
@@ -117,6 +121,7 @@ copilot-agent-util --verbose buf generate
 - `cargo test` - Run Rust tests with parallel execution
 
 ### System Operations
+
 - `sys ps` - Show running processes with filtering
 - `sys env` - Display environment variables securely
 - `sys path` - Show PATH variable with validation
@@ -125,18 +130,21 @@ copilot-agent-util --verbose buf generate
 ## Safety Features
 
 ### Command Validation
+
 - Input sanitization and validation
 - Path traversal protection
 - Command injection prevention
 - Resource limit enforcement
 
 ### Error Recovery
+
 - Graceful degradation on failures
 - Automatic retry with exponential backoff
 - State preservation during interruptions
 - Comprehensive error reporting
 
 ### Concurrent Safety
+
 - Thread-safe logging and state management
 - Atomic file operations
 - Deadlock prevention
@@ -187,6 +195,7 @@ Comprehensive logging system with multiple output targets:
 - **Metrics**: Performance and usage statistics
 
 ### Log Levels
+
 - `ERROR`: Critical failures requiring attention
 - `WARN`: Non-critical issues and warnings
 - `INFO`: General operational information

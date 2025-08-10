@@ -1,5 +1,5 @@
 // file: src/main.rs
-// version: 2.1.0
+// version: 2.2.0
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
 
 use anyhow::Result;
@@ -11,7 +11,21 @@ use copilot_agent_util::{
     logger::setup_logging,
 };
 use std::env;
+use std::fs;
 use tracing::{error, info};
+
+/// Helper function to append additional arguments from environment variable
+fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
+    if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+        let additional_args: Vec<&str> = additional_args_str.lines().collect();
+        for arg in additional_args {
+            if !arg.trim().is_empty() {
+                args.push(arg.to_string());
+            }
+        }
+    }
+    args
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,8 +44,28 @@ async fn main() -> Result<()> {
     // Create executor with config
     let executor = Executor::new(config).await?;
 
+    // Read additional arguments from file if specified
+    let mut additional_args = Vec::new();
+    if let Some(args_file) = matches.get_one::<String>("args-from-file") {
+        info!("Reading additional arguments from file: {}", args_file);
+        match fs::read_to_string(args_file) {
+            Ok(content) => {
+                additional_args = content
+                    .lines()
+                    .filter(|line| !line.trim().is_empty() && !line.trim().starts_with('#'))
+                    .map(|line| line.trim().to_string())
+                    .collect();
+                info!("Loaded {} additional arguments from file", additional_args.len());
+            }
+            Err(e) => {
+                error!("Failed to read args file {}: {}", args_file, e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     // Route to appropriate command handler
-    match execute_command(&matches, &executor).await {
+    match execute_command(&matches, &executor, &additional_args).await {
         Ok(_) => {
             info!("Command executed successfully");
             Ok(())
@@ -69,15 +103,11 @@ fn build_cli() -> Command {
                 .value_name("FILE")
                 .help("Specify custom configuration file")
         )
-        .subcommand(
-            Command::new("exec")
-                .about("Execute arbitrary commands safely")
-                .arg(
-                    Arg::new("command")
-                        .required(true)
-                        .num_args(1..)
-                        .help("Command to execute")
-                )
+        .arg(
+            Arg::new("args-from-file")
+                .long("args-from-file")
+                .value_name("FILE")
+                .help("Read additional arguments from file, one per line")
         )
         .subcommand(git::build_command())
         .subcommand(file::build_command())
@@ -92,16 +122,13 @@ fn build_cli() -> Command {
         .subcommand(uutils::build_command())
 }
 
-async fn execute_command(matches: &ArgMatches, executor: &Executor) -> Result<()> {
+async fn execute_command(matches: &ArgMatches, executor: &Executor, additional_args: &[String]) -> Result<()> {
+    // Set environment variable for additional args if present
+    if !additional_args.is_empty() {
+        env::set_var("COPILOT_AGENT_ADDITIONAL_ARGS", additional_args.join("\n"));
+    }
+
     match matches.subcommand() {
-        Some(("exec", sub_matches)) => {
-            let command_args: Vec<&str> = sub_matches
-                .get_many::<String>("command")
-                .unwrap()
-                .map(|s| s.as_str())
-                .collect();
-            executor.execute_raw(&command_args).await
-        }
         Some(("git", sub_matches)) => git::execute(sub_matches, executor).await,
         Some(("file", sub_matches)) => file::execute(sub_matches, executor).await,
         Some(("buf", sub_matches)) => buf::execute(sub_matches, executor).await,

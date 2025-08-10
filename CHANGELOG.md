@@ -1,5 +1,7 @@
 # file: CHANGELOG.md
+
 # version: 1.0.0
+
 # guid: 6f789012-bcde-f345-6789-0123456789ab
 
 # Changelog
@@ -12,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-08-08
 
 ### Added
+
 - 🎉 **Initial release of Rust copilot-agent-util**
 - **Protocol Buffer Operations** with comprehensive `buf` command support
   - Generate, lint, format, breaking analysis, build, push operations
@@ -45,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dependency management with Dependabot
 
 ### Technical Features
+
 - **Memory Safety**: Rust's ownership system prevents memory-related bugs
 - **Async/Await**: Tokio runtime for efficient I/O operations
 - **Type Safety**: Comprehensive error handling with `anyhow`
@@ -53,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container Ready**: Optimized Docker images for deployment
 
 ### Security
+
 - Supply chain security with build attestations
 - Vulnerability scanning with cargo-audit and Trivy
 - CodeQL static analysis
@@ -60,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependency review automation
 
 ### Documentation
+
 - Comprehensive CLI help system
 - Structured logging with contextual information
 - Error messages with actionable guidance
@@ -68,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Coming Soon
+
 - Configuration file validation
 - Plugin system for custom commands
 - Performance metrics and benchmarking
@@ -83,6 +90,7 @@ It provides all the functionality of the original Go version with enhanced safet
 performance, and additional tooling capabilities.
 
 The Rust version emphasizes:
+
 - **Safety**: Memory safety guaranteed by Rust's type system
 - **Performance**: Compiled binary with zero-cost abstractions
 - **Reliability**: Comprehensive error handling and logging
@@ -90,6 +98,7 @@ The Rust version emphasizes:
 - **Maintainability**: Clean architecture with modular design
 
 Install with:
+
 ```bash
 # From GitHub releases
 wget https://github.com/jdfalk/copilot-agent-util-rust/releases/latest/download/copilot-agent-util-linux-x86_64.tar.gz

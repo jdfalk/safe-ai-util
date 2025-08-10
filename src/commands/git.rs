@@ -1,10 +1,11 @@
 // file: src/commands/git.rs
-// version: 2.0.0
+// version: 2.1.0
 // guid: be0736f7-2054-4b57-82f1-b7985d18c552
 
 use crate::executor::Executor;
 use anyhow::{anyhow, Result};
 use clap::{Arg, ArgMatches, Command};
+use std::env;
 
 
 /// Build the git command with comprehensive subcommands
@@ -42,8 +43,7 @@ pub fn build_command() -> Command {
                 .arg(Arg::new("message")
                     .short('m')
                     .long("message")
-                    .help("Commit message")
-                    .required(true))
+                    .help("Commit message (can also be read from --args-from-file)"))
                 .arg(Arg::new("amend")
                     .long("amend")
                     .help("Amend the previous commit")
@@ -418,11 +418,34 @@ async fn execute_add(matches: &ArgMatches, executor: &Executor) -> Result<()> {
 async fn execute_commit(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let mut args = vec!["commit".to_string()];
 
+    // Check if we have a message from command line
+    let mut message_provided = false;
     if let Some(message) = matches.get_one::<String>("message") {
         args.push("-m".to_string());
         args.push(message.clone());
+        message_provided = true;
     }
 
+    // If no message provided, check for additional args from file
+    if !message_provided {
+        if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+            let additional_args: Vec<&str> = additional_args_str.lines().collect();
+            if !additional_args.is_empty() {
+                // Use the first line as commit message
+                args.push("-m".to_string());
+                args.push(additional_args[0].to_string());
+                // Add any additional arguments
+                for arg in additional_args.iter().skip(1) {
+                    if !arg.trim().is_empty() {
+                        args.push(arg.to_string());
+                    }
+                }
+                message_provided = true;
+            }
+        }
+    }
+
+    // If still no message, this will fail with git's normal error
     if matches.get_flag("amend") {
         args.push("--amend".to_string());
     }
