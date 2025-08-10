@@ -5,7 +5,21 @@
 use crate::executor::Executor;
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
+use std::env;
 use tracing::{debug, info};
+
+/// Helper function to append additional arguments from environment variable
+fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
+    if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+        let additional_args: Vec<&str> = additional_args_str.lines().collect();
+        for arg in additional_args {
+            if !arg.trim().is_empty() {
+                args.push(arg.to_string());
+            }
+        }
+    }
+    args
+}
 
 /// Build the linter command with various linting tools
 pub fn build_command() -> Command {
@@ -217,123 +231,155 @@ pub async fn execute(matches: &ArgMatches, executor: &Executor) -> Result<()> {
 
 async fn execute_buf_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["buf", "lint", path];
+    let mut args = vec!["buf".to_string(), "lint".to_string(), path.to_string()];
 
     if let Some(config) = matches.get_one::<String>("config") {
-        args.extend(&["--config", config]);
+        args.push("--config".to_string());
+        args.push(config.to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running buf lint on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_eslint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["eslint", path];
+    let mut args = vec!["eslint".to_string(), path.to_string()];
 
     if matches.get_flag("fix") {
-        args.push("--fix");
+        args.push("--fix".to_string());
     }
 
     if let Some(config) = matches.get_one::<String>("config") {
-        args.extend(&["--config", config]);
+        args.push("--config".to_string());
+        args.push(config.to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running ESLint on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_flake8(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
     let max_line_length = matches.get_one::<String>("max-line-length").unwrap();
 
-    let args = vec!["flake8", "--max-line-length", max_line_length, path];
+    let mut args = vec!["flake8".to_string(), "--max-line-length".to_string(), max_line_length.to_string(), path.to_string()];
+
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
 
     info!("Running flake8 on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_mypy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["mypy", path];
+    let mut args = vec!["mypy".to_string(), path.to_string()];
 
     if matches.get_flag("strict") {
-        args.push("--strict");
+        args.push("--strict".to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running mypy on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_clippy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
-    let mut args = vec!["cargo", "clippy"];
+    let mut args = vec!["cargo".to_string(), "clippy".to_string()];
 
     if matches.get_flag("all-targets") {
-        args.push("--all-targets");
+        args.push("--all-targets".to_string());
     }
 
     if matches.get_flag("all-features") {
-        args.push("--all-features");
+        args.push("--all-features".to_string());
     }
 
-    args.extend(&["--", "-D", "warnings"]);
+    args.extend(vec!["--".to_string(), "-D".to_string(), "warnings".to_string()]);
 
-    info!("Running Clippy");
-    executor.execute_raw(&args).await
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
+    info!("Running cargo clippy");
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_golangci_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["golangci-lint", "run", path];
+    let mut args = vec!["golangci-lint".to_string(), "run".to_string(), path.to_string()];
 
     if matches.get_flag("fix") {
-        args.push("--fix");
+        args.push("--fix".to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running golangci-lint on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_shellcheck(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
     let format = matches.get_one::<String>("format").unwrap();
 
-    let args = vec!["shellcheck", "--format", format, path];
+    let mut args = vec!["shellcheck".to_string(), "--format".to_string(), format.to_string(), path.to_string()];
+
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
 
     info!("Running ShellCheck on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_hadolint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let dockerfile = matches.get_one::<String>("dockerfile").unwrap();
-    let args = vec!["hadolint", dockerfile];
+    let mut args = vec!["hadolint".to_string(), dockerfile.to_string()];
+
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
 
     info!("Running Hadolint on: {}", dockerfile);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_yamllint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["yamllint", path];
+    let mut args = vec!["yamllint".to_string(), path.to_string()];
 
     if matches.get_flag("strict") {
-        args.push("--strict");
+        args.push("--strict".to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running yamllint on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_markdownlint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["markdownlint", path];
+    let mut args = vec!["markdownlint".to_string(), path.to_string()];
 
     if matches.get_flag("fix") {
-        args.push("--fix");
+        args.push("--fix".to_string());
     }
 
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     info!("Running markdownlint on: {}", path);
-    executor.execute_raw(&args).await
+    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
 }
 
 async fn execute_all_linters(matches: &ArgMatches, executor: &Executor) -> Result<()> {

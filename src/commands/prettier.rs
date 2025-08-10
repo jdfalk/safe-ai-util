@@ -5,7 +5,21 @@
 use crate::executor::Executor;
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
+use std::env;
 use tracing::{debug, info};
+
+/// Helper function to append additional arguments from environment variable
+fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
+    if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+        let additional_args: Vec<&str> = additional_args_str.lines().collect();
+        for arg in additional_args {
+            if !arg.trim().is_empty() {
+                args.push(arg.to_string());
+            }
+        }
+    }
+    args
+}
 
 /// Build the prettier/formatter command with various formatting tools
 pub fn build_command() -> Command {

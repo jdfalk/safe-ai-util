@@ -1,11 +1,25 @@
 // file: src/commands/buf.rs
-// version: 1.0.0
-// guid: fad7290a-3a19-4f89-a33c-15a68278800c
+// version: 1.1.0
+// guid: 7e8f9a0b-1c2d-3e4f-5a6b-7c8d9e0f1a2b
 
 use crate::executor::Executor;
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
+use std::env;
 use tracing::info;
+
+/// Helper function to append additional arguments from environment variable
+fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
+    if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+        let additional_args: Vec<&str> = additional_args_str.lines().collect();
+        for arg in additional_args {
+            if !arg.trim().is_empty() {
+                args.push(arg.to_string());
+            }
+        }
+    }
+    args
+}
 
 /// Build the buf command with comprehensive subcommands
 pub fn build_command() -> Command {
@@ -138,6 +152,9 @@ async fn execute_generate(matches: &ArgMatches, executor: &Executor) -> Result<(
         args.push(output.clone());
     }
 
+    // Append additional arguments from file
+    args = append_additional_args(args);
+
     info!("Generating protocol buffers with args: {:?}", args);
     let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     executor.execute_raw(&string_args).await
@@ -151,6 +168,9 @@ async fn execute_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push("--config".to_string());
         args.push(config.clone());
     }
+
+    // Append additional arguments from file
+    args = append_additional_args(args);
 
     info!("Linting protocol buffers at path: {}", path);
     let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();

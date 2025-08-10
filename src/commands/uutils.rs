@@ -3,10 +3,25 @@
 // guid: 22b67d94-f0e5-4823-8a59-3d7c8b4f6a2e
 
 use crate::executor::Executor;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::{Arg, ArgMatches, Command};
-use std::process::{Command as StdCommand, Stdio};
-use tracing::{info, debug, error};
+use std::process::Command as StdCommand;
+use std::process::Stdio;
+use std::env;
+use tracing::{debug, error, info};
+
+/// Helper function to append additional arguments from environment variable
+fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
+    if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
+        let additional_args: Vec<&str> = additional_args_str.lines().collect();
+        for arg in additional_args {
+            if !arg.trim().is_empty() {
+                args.push(arg.to_string());
+            }
+        }
+    }
+    args
+}
 
 /// Build the uutils command with comprehensive Unix utilities
 pub fn build_command() -> Command {
@@ -313,7 +328,10 @@ pub async fn execute(matches: &ArgMatches, _executor: &Executor) -> Result<()> {
 }
 
 /// Execute a uutils command with the given arguments
-async fn execute_uutil(command: &str, args: Vec<String>) -> Result<()> {
+async fn execute_uutil(command: &str, mut args: Vec<String>) -> Result<()> {
+    // Append additional arguments from environment variable
+    args = append_additional_args(args);
+
     debug!("Executing uutil command: {} with args: {:?}", command, args);
 
     // Try to use the uutils multicall binary first
