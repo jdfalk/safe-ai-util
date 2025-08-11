@@ -1,0 +1,3 @@
+# Test arguments for git status
+--porcelain
+--ignored
