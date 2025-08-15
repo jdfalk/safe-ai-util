@@ -52,10 +52,11 @@ This directory contains auto-generated documentation for this project.
 - [GitHub Scripts](.github/scripts/README.md)
 - [Security Guidelines for Reusable Workflows](.github/security-guidelines.md)
 - [GitHub Actions Workflow Usage Instructions (Pointer)](.github/workflow-usage.md)
+- [Modular Release Workflow System](.github/workflows/README.md)
 - [file: CHANGELOG.md](CHANGELOG.md)
 - [file: CONTRIBUTING.md](CONTRIBUTING.md)
 - [Copilot Agent Utility - Rust](README.md)
 - [TODO: Copilot Agent Utility - Rust Implementation](TODO.md)
 - [Documentation Index](docs/README.md)
 
-_Generated on Fri Aug 15 12:46:47 UTC 2025_
+_Generated on Fri Aug 15 13:29:52 UTC 2025_

@@ -2,6 +2,7 @@
 <!-- version: 1.0.0 -->
 ## Table of Contents
 
+  - [Table of Contents](#table-of-contents)
 - [Copilot Agent Utility - Rust](#copilot-agent-utility-rust)
   - [Overview](#overview)
   - [Features](#features)
@@ -44,13 +45,6 @@
     - [Architecture](#architecture)
   - [License](#license)
   - [Security](#security)
-
-
-<!-- guid: ed1a6dad-d6c3-461c-b2f2-7ca2ee6028ea -->
-
-# Copilot Agent Utility - Rust
-
-An extremely safe centralized command execution utility designed to solve VS Code task execution issues and provide comprehensive logging for Copilot/AI agent operations. This Rust implementation emphasizes memory safety, error handling, and robust concurrent execution.
 
 ## Overview
 

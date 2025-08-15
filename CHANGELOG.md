@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [file: CHANGELOG.md](#file-changelog-md)
+  - [Table of Contents](#table-of-contents)
 - [version: 1.0.0](#version-1-0-0)
 - [guid: 6f789012-bcde-f345-6789-0123456789ab](#guid-6f789012-bcde-f345-6789-0123456789ab)
 - [Changelog](#changelog)
@@ -16,18 +17,6 @@
   - [Release Notes](#release-notes)
 - [From GitHub releases](#from-github-releases)
 - [From Docker](#from-docker)
-
-
-# version: 1.0.0
-
-# guid: 6f789012-bcde-f345-6789-0123456789ab
-
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0] - 2025-08-08
 
