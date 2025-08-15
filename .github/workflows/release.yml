@@ -1,8 +1,8 @@
 # file: .github/workflows/release.yml
-# version: 1.0.0
+# version: 2.0.0
 # guid: a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d
 
-name: Rust Release
+name: Release Coordinator
 
 on:
   push:
@@ -29,6 +29,18 @@ on:
         required: false
         default: false
         type: boolean
+      force_language:
+        description: "Force specific language (optional)"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - rust
+          - go
+          - python
+          - javascript
+          - typescript
 
 permissions:
   contents: write
@@ -36,397 +48,114 @@ permissions:
   attestations: write
   id-token: write
 
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-
 jobs:
-  determine-version:
+  detect-language:
+    name: Detect Programming Language
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      changelog: ${{ steps.version.outputs.changelog }}
-      should-release: ${{ steps.version.outputs.should-release }}
+      language: ${{ steps.detect.outputs.language }}
+      should-release: ${{ steps.detect.outputs.should-release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js for semantic-release
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: package.json
-
-      - name: Create package.json for semantic-release
-        run: |
-          cat > package.json << EOF
-          {
-            "name": "copilot-agent-util",
-            "version": "0.0.0-development",
-            "private": true,
-            "devDependencies": {
-              "@semantic-release/changelog": "^6.0.3",
-              "@semantic-release/git": "^10.0.1",
-              "@semantic-release/github": "^9.2.6",
-              "@semantic-release/exec": "^6.0.3",
-              "semantic-release": "^22.0.12",
-              "conventional-changelog-conventionalcommits": "^7.0.2"
-            }
-          }
-          EOF
-
-      - name: Create semantic-release config
-        run: |
-          cat > .releaserc.json << EOF
-          {
-            "branches": ["main"],
-            "plugins": [
-              [
-                "@semantic-release/commit-analyzer",
-                {
-                  "preset": "conventionalcommits",
-                  "releaseRules": [
-                    {"type": "feat", "release": "minor"},
-                    {"type": "fix", "release": "patch"},
-                    {"type": "perf", "release": "patch"},
-                    {"type": "revert", "release": "patch"},
-                    {"type": "docs", "release": false},
-                    {"type": "style", "release": false},
-                    {"type": "chore", "release": false},
-                    {"type": "refactor", "release": "patch"},
-                    {"type": "test", "release": false},
-                    {"type": "build", "release": false},
-                    {"type": "ci", "release": false},
-                    {"breaking": true, "release": "major"}
-                  ]
-                }
-              ],
-              [
-                "@semantic-release/release-notes-generator",
-                {
-                  "preset": "conventionalcommits"
-                }
-              ],
-              [
-                "@semantic-release/exec",
-                {
-                  "prepareCmd": "sed -i 's/^version = \".*\"/version = \"\${nextRelease.version}\"/' Cargo.toml"
-                }
-              ],
-              [
-                "@semantic-release/changelog",
-                {
-                  "changelogFile": "CHANGELOG.md"
-                }
-              ],
-              [
-                "@semantic-release/git",
-                {
-                  "assets": ["Cargo.toml", "CHANGELOG.md"],
-                  "message": "chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}"
-                }
-              ],
-              [
-                "@semantic-release/github",
-                {
-                  "assets": [
-                    {
-                      "path": "target/release/copilot-agent-util-*",
-                      "label": "Binary releases"
-                    }
-                  ]
-                }
-              ]
-            ]
-          }
-          EOF
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Determine next version
-        id: version
+      - name: Detect primary language
+        id: detect
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MANUAL_RELEASE_TYPE: ${{ github.event.inputs.release_type }}
+          FORCE_LANGUAGE: ${{ github.event.inputs.force_language }}
         run: |
-          if [[ "$MANUAL_RELEASE_TYPE" != "auto" && "$MANUAL_RELEASE_TYPE" != "" ]]; then
-            echo "Manual release type specified: $MANUAL_RELEASE_TYPE"
-            CURRENT_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-            MAJOR=${VERSION_PARTS[0]}
-            MINOR=${VERSION_PARTS[1]}
-            PATCH=${VERSION_PARTS[2]}
-
-            case "$MANUAL_RELEASE_TYPE" in
-              "major")
-                NEW_VERSION="$((MAJOR + 1)).0.0"
-                ;;
-              "minor")
-                NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
-                ;;
-              "patch")
-                NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-                ;;
-            esac
-
-            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          # If language is forced via input, use that
+          if [[ "$FORCE_LANGUAGE" != "auto" && "$FORCE_LANGUAGE" != "" ]]; then
+            echo "language=$FORCE_LANGUAGE" >> $GITHUB_OUTPUT
             echo "should-release=true" >> $GITHUB_OUTPUT
-            echo "changelog=Manual $MANUAL_RELEASE_TYPE release" >> $GITHUB_OUTPUT
-          else
-            # Run semantic-release in dry-run mode to determine version
-            npx semantic-release --dry-run > release_output.log 2>&1 || true
-
-            if grep -q "The next release version is" release_output.log; then
-              NEW_VERSION=$(grep "The next release version is" release_output.log | sed 's/.*The next release version is \([0-9.]*\).*/\1/')
-              echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "should-release=true" >> $GITHUB_OUTPUT
-
-              # Extract changelog
-              CHANGELOG=$(npx semantic-release --dry-run 2>&1 | grep -A 100 "Release note for version" | tail -n +2 | head -n -1 || echo "Automated release")
-              echo "changelog<<EOF" >> $GITHUB_OUTPUT
-              echo "$CHANGELOG" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
+            echo "Forced language: $FORCE_LANGUAGE"
+            exit 0
+          fi
+          
+          # Auto-detect based on key files
+          DETECTED_LANGUAGE=""
+          
+          # Check for Rust
+          if [[ -f "Cargo.toml" ]]; then
+            DETECTED_LANGUAGE="rust"
+          # Check for Go
+          elif [[ -f "go.mod" ]]; then
+            DETECTED_LANGUAGE="go"
+          # Check for Python
+          elif [[ -f "pyproject.toml" || -f "setup.py" || -f "requirements.txt" ]]; then
+            DETECTED_LANGUAGE="python"
+          # Check for Node.js/JavaScript
+          elif [[ -f "package.json" ]]; then
+            # Check if it's TypeScript
+            if [[ -f "tsconfig.json" || -f "*.ts" ]]; then
+              DETECTED_LANGUAGE="typescript"
             else
-              echo "No release needed based on conventional commits"
-              echo "should-release=false" >> $GITHUB_OUTPUT
+              DETECTED_LANGUAGE="javascript"
             fi
-          fi
-
-  build:
-    name: Build for ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    needs: determine-version
-    if: needs.determine-version.outputs.should-release == 'true'
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: linux-amd64
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: linux-amd64-musl
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: linux-arm64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: darwin-amd64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: darwin-arm64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: windows-amd64
-            ext: .exe
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install cross-compilation tools (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu musl-tools
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.target }}-
-            ${{ runner.os }}-cargo-
-
-      - name: Update Cargo.toml version
-        shell: bash
-        run: |
-          sed -i 's/^version = ".*"/version = "${{ needs.determine-version.outputs.version }}"/' Cargo.toml
-
-      - name: Build binary
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Create archive (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          mkdir -p releases
-          tar -czf releases/copilot-agent-util-${{ needs.determine-version.outputs.version }}-${{ matrix.name }}.tar.gz \
-            -C target/${{ matrix.target }}/release copilot-agent-util
-
-      - name: Create archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir releases
-          Compress-Archive -Path target/${{ matrix.target }}/release/copilot-agent-util.exe -DestinationPath releases/copilot-agent-util-${{ needs.determine-version.outputs.version }}-${{ matrix.name }}.zip
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: copilot-agent-util-${{ matrix.name }}
-          path: releases/*
-
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [determine-version, build]
-    if: needs.determine-version.outputs.should-release == 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js for semantic-release
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: package.json
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./releases
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -la ./releases/
-
-      - name: Create package.json for semantic-release
-        run: |
-          cat > package.json << EOF
-          {
-            "name": "copilot-agent-util",
-            "version": "0.0.0-development",
-            "private": true,
-            "devDependencies": {
-              "@semantic-release/changelog": "^6.0.3",
-              "@semantic-release/git": "^10.0.1",
-              "@semantic-release/github": "^9.2.6",
-              "@semantic-release/exec": "^6.0.3",
-              "semantic-release": "^22.0.12",
-              "conventional-changelog-conventionalcommits": "^7.0.2"
-            }
-          }
-          EOF
-
-      - name: Create semantic-release config
-        run: |
-          cat > .releaserc.json << EOF
-          {
-            "branches": ["main"],
-            "plugins": [
-              [
-                "@semantic-release/commit-analyzer",
-                {
-                  "preset": "conventionalcommits",
-                  "releaseRules": [
-                    {"type": "feat", "release": "minor"},
-                    {"type": "fix", "release": "patch"},
-                    {"type": "perf", "release": "patch"},
-                    {"type": "revert", "release": "patch"},
-                    {"type": "docs", "release": false},
-                    {"type": "style", "release": false},
-                    {"type": "chore", "release": false},
-                    {"type": "refactor", "release": "patch"},
-                    {"type": "test", "release": false},
-                    {"type": "build", "release": false},
-                    {"type": "ci", "release": false},
-                    {"breaking": true, "release": "major"}
-                  ]
-                }
-              ],
-              [
-                "@semantic-release/release-notes-generator",
-                {
-                  "preset": "conventionalcommits"
-                }
-              ],
-              [
-                "@semantic-release/exec",
-                {
-                  "prepareCmd": "sed -i 's/^version = \".*\"/version = \"\${nextRelease.version}\"/' Cargo.toml"
-                }
-              ],
-              [
-                "@semantic-release/changelog",
-                {
-                  "changelogFile": "CHANGELOG.md"
-                }
-              ],
-              [
-                "@semantic-release/git",
-                {
-                  "assets": ["Cargo.toml", "CHANGELOG.md"],
-                  "message": "chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}"
-                }
-              ],
-              [
-                "@semantic-release/github",
-                {
-                  "assets": [
-                    "./releases/*.tar.gz",
-                    "./releases/*.zip"
-                  ]
-                }
-              ]
-            ]
-          }
-          EOF
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [[ "${{ github.event.inputs.release_type }}" != "auto" && "${{ github.event.inputs.release_type }}" != "" ]]; then
-            # Manual release - create GitHub release directly
-            gh release create "${{ needs.determine-version.outputs.tag }}" \
-              --title "Release ${{ needs.determine-version.outputs.version }}" \
-              --notes "${{ needs.determine-version.outputs.changelog }}" \
-              ${{ github.event.inputs.prerelease == 'true' && '--prerelease' || '' }} \
-              ${{ github.event.inputs.draft == 'true' && '--draft' || '' }} \
-              ./releases/*
+          # Default fallback
           else
-            # Use semantic-release for automated releases
-            npx semantic-release
+            echo "No supported language detected"
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          
+          echo "language=$DETECTED_LANGUAGE" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          echo "Detected language: $DETECTED_LANGUAGE"
 
-  update-homebrew:
-    name: Update Homebrew Formula
-    runs-on: ubuntu-latest
-    needs: [determine-version, release]
-    if: needs.determine-version.outputs.should-release == 'true' && github.event.inputs.prerelease != 'true'
-    steps:
-      - name: Update Homebrew formula
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Homebrew formula update would go here"
-          echo "Version: ${{ needs.determine-version.outputs.version }}"
-          echo "Tag: ${{ needs.determine-version.outputs.tag }}"
-          # This would typically update a homebrew-tap repository
-          # or submit a PR to homebrew/homebrew-core
+  release-rust:
+    name: Rust Release
+    needs: detect-language
+    if: needs.detect-language.outputs.should-release == 'true' && needs.detect-language.outputs.language == 'rust'
+    uses: ./.github/workflows/release-rust.yml
+    with:
+      release_type: ${{ github.event.inputs.release_type || 'auto' }}
+      prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      draft: ${{ github.event.inputs.draft == 'true' }}
+    secrets: inherit
+
+  release-go:
+    name: Go Release
+    needs: detect-language
+    if: needs.detect-language.outputs.should-release == 'true' && needs.detect-language.outputs.language == 'go'
+    uses: ./.github/workflows/release-go.yml
+    with:
+      release_type: ${{ github.event.inputs.release_type || 'auto' }}
+      prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      draft: ${{ github.event.inputs.draft == 'true' }}
+    secrets: inherit
+
+  release-python:
+    name: Python Release
+    needs: detect-language
+    if: needs.detect-language.outputs.should-release == 'true' && needs.detect-language.outputs.language == 'python'
+    uses: ./.github/workflows/release-python.yml
+    with:
+      release_type: ${{ github.event.inputs.release_type || 'auto' }}
+      prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      draft: ${{ github.event.inputs.draft == 'true' }}
+    secrets: inherit
+
+  release-javascript:
+    name: JavaScript Release
+    needs: detect-language
+    if: needs.detect-language.outputs.should-release == 'true' && needs.detect-language.outputs.language == 'javascript'
+    uses: ./.github/workflows/release-javascript.yml
+    with:
+      release_type: ${{ github.event.inputs.release_type || 'auto' }}
+      prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      draft: ${{ github.event.inputs.draft == 'true' }}
+    secrets: inherit
+
+  release-typescript:
+    name: TypeScript Release
+    needs: detect-language
+    if: needs.detect-language.outputs.should-release == 'true' && needs.detect-language.outputs.language == 'typescript'
+    uses: ./.github/workflows/release-typescript.yml
+    with:
+      release_type: ${{ github.event.inputs.release_type || 'auto' }}
+      prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      draft: ${{ github.event.inputs.draft == 'true' }}
+    secrets: inherit
