@@ -1,5 +1,23 @@
 # file: CHANGELOG.md
 
+## Table of Contents
+
+- [file: CHANGELOG.md](#file-changelog-md)
+- [version: 1.0.0](#version-1-0-0)
+- [guid: 6f789012-bcde-f345-6789-0123456789ab](#guid-6f789012-bcde-f345-6789-0123456789ab)
+- [Changelog](#changelog)
+  - [[1.0.0] - 2025-08-08](#-1-0-0-2025-08-08)
+    - [Added](#added)
+    - [Technical Features](#technical-features)
+    - [Security](#security)
+    - [Documentation](#documentation)
+  - [[Unreleased]](#-unreleased)
+    - [Coming Soon](#coming-soon)
+  - [Release Notes](#release-notes)
+- [From GitHub releases](#from-github-releases)
+- [From Docker](#from-docker)
+
+
 # version: 1.0.0
 
 # guid: 6f789012-bcde-f345-6789-0123456789ab
