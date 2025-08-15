@@ -161,7 +161,7 @@ jobs:
             MAJOR=${VERSION_PARTS[0]}
             MINOR=${VERSION_PARTS[1]}
             PATCH=${VERSION_PARTS[2]}
-            
+
             case "$MANUAL_RELEASE_TYPE" in
               "major")
                 NEW_VERSION="$((MAJOR + 1)).0.0"
@@ -173,7 +173,7 @@ jobs:
                 NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
                 ;;
             esac
-            
+
             echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
             echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
             echo "should-release=true" >> $GITHUB_OUTPUT
@@ -181,13 +181,13 @@ jobs:
           else
             # Run semantic-release in dry-run mode to determine version
             npx semantic-release --dry-run > release_output.log 2>&1 || true
-            
+
             if grep -q "The next release version is" release_output.log; then
               NEW_VERSION=$(grep "The next release version is" release_output.log | sed 's/.*The next release version is \([0-9.]*\).*/\1/')
               echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
               echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
               echo "should-release=true" >> $GITHUB_OUTPUT
-              
+
               # Extract changelog
               CHANGELOG=$(npx semantic-release --dry-run 2>&1 | grep -A 100 "Release note for version" | tail -n +2 | head -n -1 || echo "Automated release")
               echo "changelog<<EOF" >> $GITHUB_OUTPUT

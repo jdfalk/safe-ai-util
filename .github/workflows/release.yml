@@ -73,10 +73,10 @@ jobs:
             echo "Forced language: $FORCE_LANGUAGE"
             exit 0
           fi
-          
+
           # Auto-detect based on key files
           DETECTED_LANGUAGE=""
-          
+
           # Check for Rust
           if [[ -f "Cargo.toml" ]]; then
             DETECTED_LANGUAGE="rust"
@@ -100,7 +100,7 @@ jobs:
             echo "should-release=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "language=$DETECTED_LANGUAGE" >> $GITHUB_OUTPUT
           echo "should-release=true" >> $GITHUB_OUTPUT
           echo "Detected language: $DETECTED_LANGUAGE"
