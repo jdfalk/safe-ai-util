@@ -699,7 +699,7 @@ impl RustEditor {
 
     fn insert_newline(&mut self) {
         let cursor_col = self.cursor_col;
-        let current_line = self.get_current_line().clone();
+        let current_line = self.get_current_line();
         let split_pos = std::cmp::min(cursor_col, current_line.len());
         let left = current_line[..split_pos].to_string();
         let right = current_line[split_pos..].to_string();
