@@ -1,6 +1,6 @@
 #!/bin/bash
 # file: tools/copilot-agent-util-rust/distribute-binaries.sh
-# version: 1.0.0
+# version: 1.1.0
 # guid: c3d4e5f6-a7b8-9012-cdef-345678901234
 
 # Distribute cross-platform binaries to all repositories
