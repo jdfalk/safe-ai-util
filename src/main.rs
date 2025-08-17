@@ -1,5 +1,5 @@
 // file: src/main.rs
-// version: 2.2.0
+// version: 2.3.0
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
 
 use anyhow::Result;
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
 
     // Read additional arguments from file if specified
     let mut additional_args = Vec::new();
-    if let Some(args_file) = matches.get_one::<String>("args-from-file") {
+    if let Some(args_file) = matches.get_one::<String>("args-file") {
         info!("Reading additional arguments from file: {}", args_file);
         match fs::read_to_string(args_file) {
             Ok(content) => {
@@ -104,8 +104,8 @@ fn build_cli() -> Command {
                 .help("Specify custom configuration file")
         )
         .arg(
-            Arg::new("args-from-file")
-                .long("args-from-file")
+            Arg::new("args-file")
+                .long("args-file")
                 .value_name("FILE")
                 .help("Read additional arguments from file, one per line")
         )
