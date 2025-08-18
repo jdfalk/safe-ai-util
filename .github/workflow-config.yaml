@@ -1,0 +1,100 @@
+# file: .github/workflow-config.yaml
+# version: 1.0.0
+# guid: b8c9d0e1-f2a3-4567-8901-23456789abcd
+
+# Repository-Specific Workflow Configuration for copilot-agent-util-rust
+# This file configures the workflow system for this specific repository
+
+build:
+  # Language version matrices
+  rust_versions:
+    - "1.75"
+    - "1.76"
+    - "1.77"
+
+  # Platform support
+  platforms:
+    - "linux/amd64"
+    - "linux/arm64"
+    - "darwin/amd64"
+    - "darwin/arm64"
+    - "windows/amd64"
+
+  operating_systems:
+    - "ubuntu-latest"
+    - "macos-latest"
+    - "windows-latest"
+
+  # Feature flags specific to copilot-agent-util-rust
+  enable_protobuf: false
+  enable_docker: true
+  enable_cross_compile: true
+  enable_coverage: true
+  enable_security_scan: true
+
+# Repository information
+repository:
+  name: "copilot-agent-util-rust"
+  type: "rust"
+  main_language: "rust"
+  has_docker: true
+  has_protobuf: false
+  has_database: false
+
+# Build configuration
+build_config:
+  rust:
+    toolchain: "stable"
+    cross_compile: true
+    release_builds: true
+    targets:
+      - "x86_64-unknown-linux-gnu"
+      - "x86_64-unknown-linux-musl"
+      - "aarch64-unknown-linux-gnu"
+      - "x86_64-apple-darwin"
+      - "aarch64-apple-darwin"
+      - "x86_64-pc-windows-gnu"
+
+  docker:
+    enabled: true
+    multi_stage: true
+    platforms:
+      - "linux/amd64"
+      - "linux/arm64"
+
+  testing:
+    coverage_threshold: 85
+    run_integration_tests: true
+    run_benchmarks: true
+    run_docker_tests: true
+
+# Quality gates
+quality:
+  coverage_threshold: 85
+  security_scan_required: true
+  lint_required: true
+  tests_required: true
+
+  # Rust-specific quality rules
+  clippy_required: true
+  rustfmt_required: true
+  cargo_audit_required: true
+
+# Development settings
+development:
+  debug_mode: false
+  verbose_logging: false
+
+  # Rust-specific settings
+  cargo_fmt_check: true
+  cargo_clippy_check: true
+
+# Performance settings
+performance:
+  cache_enabled: true
+  parallel_jobs: 4
+  timeout_minutes: 45
+
+  # Rust-specific performance
+  cargo_cache: true
+  incremental_builds: true
