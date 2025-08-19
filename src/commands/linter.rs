@@ -242,7 +242,13 @@ async fn execute_buf_lint(matches: &ArgMatches, executor: &Executor) -> Result<(
     args = append_additional_args(args);
 
     info!("Running buf lint on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_eslint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -262,7 +268,13 @@ async fn execute_eslint(matches: &ArgMatches, executor: &Executor) -> Result<()>
     args = append_additional_args(args);
 
     info!("Running ESLint on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_flake8(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -275,7 +287,13 @@ async fn execute_flake8(matches: &ArgMatches, executor: &Executor) -> Result<()>
     args = append_additional_args(args);
 
     info!("Running flake8 on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_mypy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -290,7 +308,13 @@ async fn execute_mypy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     args = append_additional_args(args);
 
     info!("Running mypy on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_clippy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -310,7 +334,13 @@ async fn execute_clippy(matches: &ArgMatches, executor: &Executor) -> Result<()>
     args = append_additional_args(args);
 
     info!("Running cargo clippy");
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_golangci_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -325,7 +355,13 @@ async fn execute_golangci_lint(matches: &ArgMatches, executor: &Executor) -> Res
     args = append_additional_args(args);
 
     info!("Running golangci-lint on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_shellcheck(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -338,7 +374,13 @@ async fn execute_shellcheck(matches: &ArgMatches, executor: &Executor) -> Result
     args = append_additional_args(args);
 
     info!("Running ShellCheck on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_hadolint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -349,7 +391,13 @@ async fn execute_hadolint(matches: &ArgMatches, executor: &Executor) -> Result<(
     args = append_additional_args(args);
 
     info!("Running Hadolint on: {}", dockerfile);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_yamllint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -364,7 +412,13 @@ async fn execute_yamllint(matches: &ArgMatches, executor: &Executor) -> Result<(
     args = append_additional_args(args);
 
     info!("Running yamllint on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_markdownlint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -379,7 +433,13 @@ async fn execute_markdownlint(matches: &ArgMatches, executor: &Executor) -> Resu
     args = append_additional_args(args);
 
     info!("Running markdownlint on: {}", path);
-    executor.execute_raw(&args.iter().map(|s| s.as_str()).collect::<Vec<&str>>()).await
+    match args.first() {
+
+        Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+
+        None => anyhow::bail!("No command specified")
+
+    }
 }
 
 async fn execute_all_linters(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -425,7 +485,10 @@ async fn execute_all_linters(matches: &ArgMatches, executor: &Executor) -> Resul
 
     for (name, args) in linters {
         info!("Running {}", name);
-        match executor.execute_raw(&args).await {
+        match match args.first() {
+     Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+     None => anyhow::bail!("No command specified")
+ } {
             Ok(_) => info!("{}: ✅ Passed", name),
             Err(e) => {
                 debug!("{}: ❌ Failed: {}", name, e);

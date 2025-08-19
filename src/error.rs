@@ -1,5 +1,5 @@
 // file: src/error.rs
-// version: 1.0.0
+// version: 2.0.0
 // guid: 57b83a63-07b6-4534-aa6c-51e8797254e0
 
 use thiserror::Error;
@@ -42,6 +42,12 @@ pub enum AgentError {
 
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+
+    #[error("Security violation: {0}")]
+    Security(String),
+
+    #[error("System error: {0}")]
+    System(String),
 
     #[error("Other error: {0}")]
     Other(String),
@@ -86,6 +92,16 @@ impl AgentError {
     /// Create a new network error
     pub fn network(msg: impl Into<String>) -> Self {
         Self::Network(msg.into())
+    }
+
+    /// Create a new security error
+    pub fn security(msg: impl Into<String>) -> Self {
+        Self::Security(msg.into())
+    }
+
+    /// Create a new system error
+    pub fn system(msg: impl Into<String>) -> Self {
+        Self::System(msg.into())
     }
 
     /// Create a new other error

@@ -409,9 +409,7 @@ async fn execute_add(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         }
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git commit command
@@ -458,9 +456,7 @@ async fn execute_commit(matches: &ArgMatches, executor: &Executor) -> Result<()>
         args.push("-s".to_string());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git push command
@@ -485,9 +481,7 @@ async fn execute_push(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push(branch.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git pull command
@@ -510,9 +504,7 @@ async fn execute_pull(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push(branch.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git status command
@@ -531,9 +523,7 @@ async fn execute_status(matches: &ArgMatches, executor: &Executor) -> Result<()>
         args.push("--porcelain".to_string());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git branch command
@@ -556,9 +546,7 @@ async fn execute_branch(matches: &ArgMatches, executor: &Executor) -> Result<()>
         args.push(name.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git checkout command
@@ -577,9 +565,7 @@ async fn execute_checkout(matches: &ArgMatches, executor: &Executor) -> Result<(
         args.push(branch.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git merge command
@@ -598,9 +584,7 @@ async fn execute_merge(matches: &ArgMatches, executor: &Executor) -> Result<()> 
         args.push(branch.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git rebase command
@@ -619,9 +603,7 @@ async fn execute_rebase(matches: &ArgMatches, executor: &Executor) -> Result<()>
         args.push(upstream.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git reset command
@@ -640,9 +622,7 @@ async fn execute_reset(matches: &ArgMatches, executor: &Executor) -> Result<()> 
         args.push(commit.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git log command
@@ -666,9 +646,7 @@ async fn execute_log(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push(since.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git diff command
@@ -695,9 +673,7 @@ async fn execute_diff(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         }
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git stash command
@@ -732,9 +708,7 @@ async fn execute_stash(matches: &ArgMatches, executor: &Executor) -> Result<()> 
         }
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git remote command
@@ -767,9 +741,7 @@ async fn execute_remote(matches: &ArgMatches, executor: &Executor) -> Result<()>
         }
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git tag command
@@ -795,9 +767,7 @@ async fn execute_tag(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push(commit.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git clone command
@@ -822,9 +792,7 @@ async fn execute_clone(matches: &ArgMatches, executor: &Executor) -> Result<()> 
         args.push(directory.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git fetch command
@@ -843,9 +811,7 @@ async fn execute_fetch(matches: &ArgMatches, executor: &Executor) -> Result<()> 
         args.push(remote.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }
 
 /// Execute git init command
@@ -860,7 +826,5 @@ async fn execute_init(matches: &ArgMatches, executor: &Executor) -> Result<()> {
         args.push(directory.clone());
     }
 
-    args.insert(0, "git".to_string());
-    let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&args_str).await
+    executor.execute_secure("git", &args).await
 }

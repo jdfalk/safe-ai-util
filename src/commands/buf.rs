@@ -156,8 +156,7 @@ async fn execute_generate(matches: &ArgMatches, executor: &Executor) -> Result<(
     args = append_additional_args(args);
 
     info!("Generating protocol buffers with args: {:?}", args);
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }
 
 async fn execute_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
