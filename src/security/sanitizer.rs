@@ -9,8 +9,7 @@
 
 use crate::error::{AgentError, Result};
 use regex::Regex;
-use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Sanitize command arguments based on command-specific rules
 pub fn sanitize_arguments(command: &str, args: &[String]) -> Result<Vec<String>> {

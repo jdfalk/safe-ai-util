@@ -14,7 +14,7 @@ pub mod audit;
 
 use crate::error::{AgentError, Result};
 use std::collections::HashSet;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 /// Security configuration and enforcement
 #[derive(Debug, Clone)]

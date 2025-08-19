@@ -7,7 +7,7 @@ use crate::security::{SecurityManager, audit};
 use crate::error::{AgentError, Result};
 use std::process::Stdio;
 use tokio::process::Command;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 /// Safe command executor with comprehensive security controls
 pub struct Executor {
