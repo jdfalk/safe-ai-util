@@ -172,8 +172,7 @@ async fn execute_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     args = append_additional_args(args);
 
     info!("Linting protocol buffers at path: {}", path);
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }
 
 async fn execute_format(matches: &ArgMatches, executor: &Executor) -> Result<()> {
