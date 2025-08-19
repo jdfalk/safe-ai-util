@@ -291,7 +291,6 @@ pub fn initialize_audit_system() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     #[test]
     fn test_audit_entry_serialization() {
