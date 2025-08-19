@@ -12,7 +12,7 @@ fn test_help_command() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Extremely safe centralized utility",
+            "reliable command execution utility",
         ));
 }
 
