@@ -314,11 +314,8 @@ async fn execute_prettier(matches: &ArgMatches, executor: &Executor) -> Result<(
 
     info!("Running Prettier on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
-
         None => anyhow::bail!("No command specified")
-
     }
 }
 

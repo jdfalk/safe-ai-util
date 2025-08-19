@@ -189,8 +189,7 @@ async fn execute_format(matches: &ArgMatches, executor: &Executor) -> Result<()>
     }
 
     info!("Formatting protocol buffers at path: {}", path);
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }
 
 async fn execute_breaking(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -203,8 +202,7 @@ async fn execute_breaking(matches: &ArgMatches, executor: &Executor) -> Result<(
     ];
 
     info!("Checking for breaking changes against: {}", against);
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }
 
 async fn execute_build(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -212,8 +210,7 @@ async fn execute_build(matches: &ArgMatches, executor: &Executor) -> Result<()> 
     let args = vec!["buf".to_string(), "build".to_string(), path.clone()];
 
     info!("Building protocol buffers at path: {}", path);
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }
 
 async fn execute_push(matches: &ArgMatches, executor: &Executor) -> Result<()> {
@@ -225,6 +222,5 @@ async fn execute_push(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     }
 
     info!("Pushing to Buf Schema Registry");
-    let string_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    executor.execute_raw(&string_args).await
+    executor.execute_secure("buf", &args[1..]).await
 }

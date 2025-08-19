@@ -32,12 +32,15 @@ impl Executor {
     }
 
     /// Execute a command with full security validation
-    pub async fn execute_secure(&self, command: &str, args: &[String]) -> Result<()> {
+    pub async fn execute_secure<T: AsRef<str>>(&self, command: &str, args: &[T]) -> anyhow::Result<()> {
         // Validate execution context first
-        self.security.validate_execution_context()?;
+        self.security.validate_execution_context().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        // Convert args to String vector for security validation
+        let string_args: Vec<String> = args.iter().map(|s| s.as_ref().to_string()).collect();
 
         // Validate and sanitize the command and arguments
-        let sanitized_args = self.security.validate_arguments(command, args)?;
+        let sanitized_args = self.security.validate_arguments(command, &string_args).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         info!(
             "Executing secure command: {} with sanitized args: {:?}",
@@ -53,12 +56,12 @@ impl Executor {
         // Validate command exists
         if which::which(command).is_err() {
             let error_msg = format!("Command not found: {}", command);
-            audit::log_security_violation(command, args, &error_msg);
-            return Err(AgentError::validation(error_msg));
+            audit::log_security_violation(command, &string_args, &error_msg);
+            return Err(anyhow::anyhow!("{}", error_msg));
         }
 
         // Execute command with security monitoring
-        self.execute_command_impl(command, &sanitized_args).await
+        self.execute_command_impl(command, &sanitized_args).await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Execute a raw command with arguments (DEPRECATED - use execute_secure instead)
@@ -75,6 +78,7 @@ impl Executor {
 
         // Route through secure execution
         self.execute_secure(command, &string_args).await
+            .map_err(|e| AgentError::execution(e.to_string()))
     }
 
     /// Internal implementation of command execution
