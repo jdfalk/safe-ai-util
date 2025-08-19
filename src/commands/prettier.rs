@@ -9,6 +9,7 @@ use std::env;
 use tracing::{debug, info};
 
 /// Helper function to append additional arguments from environment variable
+#[allow(dead_code)]
 fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
     if let Ok(additional_args_str) = env::var("COPILOT_AGENT_ADDITIONAL_ARGS") {
         let additional_args: Vec<&str> = additional_args_str.lines().collect();

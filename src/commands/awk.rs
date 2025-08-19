@@ -219,6 +219,7 @@ impl AwkContext {
         }
     }
 
+    #[allow(dead_code)]
     fn set_variable(&mut self, name: &str, value: &str) {
         match name {
             "FS" => self.fs = value.to_string(),

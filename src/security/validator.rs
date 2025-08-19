@@ -82,11 +82,13 @@ fn validate_git_reset_args(args: &[String]) -> Result<()> {
 /// Validate git clean arguments
 fn validate_git_clean_args(args: &[String]) -> Result<()> {
     let mut has_safe_flag = false;
+    let mut has_force_flag = false;
 
     for arg in args {
         match arg.as_str() {
             "-n" | "--dry-run" => has_safe_flag = true,
             "-f" | "--force" => {
+                has_force_flag = true;
                 warn!("Git clean --force detected - destructive operation");
             }
             "-x" | "-X" => {
@@ -103,6 +105,11 @@ fn validate_git_clean_args(args: &[String]) -> Result<()> {
             }
             _ => {}
         }
+    }
+
+    // If force flag is used without dry-run, require explicit confirmation
+    if has_force_flag && !has_safe_flag {
+        warn!("Git clean --force without --dry-run detected - potentially destructive");
     }
 
     Ok(())

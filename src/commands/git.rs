@@ -438,7 +438,6 @@ async fn execute_commit(matches: &ArgMatches, executor: &Executor) -> Result<()>
                         args.push(arg.to_string());
                     }
                 }
-                message_provided = true;
             }
         }
     }
