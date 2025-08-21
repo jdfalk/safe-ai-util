@@ -1,293 +1,130 @@
 # file: .github/workflows/release-rust.yml
-# version: 1.2.0
-# guid: b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e
+# version: 1.0.0
+# guid: b5c6d7e8-f9a0-1b2c-3d4e-5f6a7b8c9d0e
 
-name: Rust Release
+name: Rust Release Build
 
 on:
   workflow_call:
     inputs:
-      release_type:
-        description: "Release type"
+      protobuf-artifacts:
+        description: "Whether protobuf artifacts are available"
         required: false
-        default: "auto"
         type: string
-      prerelease:
-        description: "Is this a prerelease?"
-        required: false
-        default: false
-        type: boolean
-      draft:
-        description: "Create as draft?"
-        required: false
-        default: false
-        type: boolean
-    outputs:
-      version:
-        description: "The released version"
-        value: ${{ jobs.release.outputs.version }}
-      tag:
-        description: "The release tag"
-        value: ${{ jobs.release.outputs.tag }}
+        default: "false"
 
 permissions:
   contents: write
   packages: write
-  attestations: write
-  id-token: write
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
 
 jobs:
-  determine-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      changelog: ${{ steps.version.outputs.changelog }}
-      should-release: ${{ steps.version.outputs.should-release }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js for semantic-release
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Setup semantic-release files
-        run: |
-          cp .github/semantic-release-package.json package.json
-          cp .github/semantic-release.config.json .releaserc.json
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Determine next version
-        id: version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MANUAL_RELEASE_TYPE: ${{ inputs.release_type }}
-        run: |
-          if [[ "$MANUAL_RELEASE_TYPE" != "auto" && "$MANUAL_RELEASE_TYPE" != "" ]]; then
-            echo "Manual release type specified: $MANUAL_RELEASE_TYPE"
-            CURRENT_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-            MAJOR=${VERSION_PARTS[0]}
-            MINOR=${VERSION_PARTS[1]}
-            PATCH=${VERSION_PARTS[2]}
-
-            case "$MANUAL_RELEASE_TYPE" in
-              "major")
-                NEW_VERSION="$((MAJOR + 1)).0.0"
-                ;;
-              "minor")
-                NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
-                ;;
-              "patch")
-                NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-                ;;
-            esac
-
-            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "should-release=true" >> $GITHUB_OUTPUT
-            echo "changelog=Manual $MANUAL_RELEASE_TYPE release" >> $GITHUB_OUTPUT
-          else
-            # Run semantic-release in dry-run mode to determine version
-            npx semantic-release --dry-run > release_output.log 2>&1 || true
-
-            if grep -q "The next release version is" release_output.log; then
-              NEW_VERSION=$(grep "The next release version is" release_output.log | sed 's/.*The next release version is \([0-9.]*\).*/\1/')
-              echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "should-release=true" >> $GITHUB_OUTPUT
-
-              # Extract changelog
-              CHANGELOG=$(npx semantic-release --dry-run 2>&1 | grep -A 100 "Release note for version" | tail -n +2 | head -n -1 || echo "Automated release")
-              echo "changelog<<EOF" >> $GITHUB_OUTPUT
-              echo "$CHANGELOG" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
-            else
-              echo "No release needed based on conventional commits"
-              echo "should-release=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-  build:
-    name: Build for ${{ matrix.target }}
+  # Rust cross-platform build with comprehensive support
+  build-rust:
+    name: Build Rust (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    needs: determine-version
-    if: needs.determine-version.outputs.should-release == 'true'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            name: linux-amd64
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: linux-amd64-musl
+            name: linux-x86_64
+            primary: true
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             name: linux-arm64
+            primary: false
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: linux-x86_64-musl
+            primary: false
           - target: x86_64-apple-darwin
             os: macos-latest
-            name: darwin-amd64
+            name: macos-x86_64
+            primary: false
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: darwin-arm64
+            name: macos-arm64
+            primary: false
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: windows-amd64
-            ext: .exe
-
+            name: windows-x86_64
+            primary: false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Download protobuf artifacts
+        if: inputs.protobuf-artifacts == 'true'
+        uses: actions/download-artifact@v5
         with:
-          targets: ${{ matrix.target }}
+          name: protobuf-generated
 
-      - name: Install cross-compilation tools (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu musl-tools
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.target }}-
-            ${{ runner.os }}-cargo-
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Update Cargo.toml version
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            sed -i '' 's/^version = ".*"/version = "${{ needs.determine-version.outputs.version }}"/' Cargo.toml
-          else
-            sed -i 's/^version = ".*"/version = "${{ needs.determine-version.outputs.version }}"/' Cargo.toml
-          fi
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build binary
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Clippy
+        if: matrix.primary
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        if: matrix.primary
+        run: cargo test --verbose
+
+      - name: Build release binary
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Get binary name from Cargo.toml
-        id: binary-name
-        shell: bash
+      - name: Prepare binary (Unix)
+        if: runner.os != 'Windows'
         run: |
-          # Extract binary name from Cargo.toml
-          if grep -q "^\[\[bin\]\]" Cargo.toml; then
-            BINARY_NAME=$(awk '/\[\[bin\]\]/{flag=1; next} flag && /^name =/{gsub(/[" ]/, "", $3); print $3; exit}' Cargo.toml)
-          else
-            # Fall back to package name
-            BINARY_NAME=$(grep '^name = ' Cargo.toml | head -1 | sed 's/name = "\(.*\)"/\1/')
-          fi
-          echo "binary_name=$BINARY_NAME" >> $GITHUB_OUTPUT
-          echo "Binary name: $BINARY_NAME"
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/$(basename $(pwd)) dist/$(basename $(pwd))-${{ matrix.name }}
+          chmod +x dist/$(basename $(pwd))-${{ matrix.name }}
 
-      - name: Create archive (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Prepare binary (Windows)
+        if: runner.os == 'Windows'
         run: |
-          mkdir -p releases
-          tar -czf releases/${{ steps.binary-name.outputs.binary_name }}-${{ needs.determine-version.outputs.version }}-${{ matrix.name }}.tar.gz \
-            -C target/${{ matrix.target }}/release ${{ steps.binary-name.outputs.binary_name }}
+          mkdir dist
+          copy target\\${{ matrix.target }}\\release\\$(Split-Path -Leaf $(Get-Location)).exe dist\\$(Split-Path -Leaf $(Get-Location))-${{ matrix.name }}.exe
 
-      - name: Create archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir releases
-          Compress-Archive -Path target/${{ matrix.target }}/release/${{ steps.binary-name.outputs.binary_name }}.exe -DestinationPath releases/${{ steps.binary-name.outputs.binary_name }}-${{ needs.determine-version.outputs.version }}-${{ matrix.name }}.zip
-
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.binary-name.outputs.binary_name }}-${{ matrix.name }}
-          path: releases/*
-
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [determine-version, build]
-    if: needs.determine-version.outputs.should-release == 'true'
-    outputs:
-      version: ${{ needs.determine-version.outputs.version }}
-      tag: ${{ needs.determine-version.outputs.tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js for semantic-release
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./releases
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -la ./releases/
-
-      - name: Setup semantic-release files
-        run: |
-          cp .github/semantic-release-package.json package.json
-          cp .github/semantic-release.config.json .releaserc.json
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [[ "${{ inputs.release_type }}" != "auto" && "${{ inputs.release_type }}" != "" ]]; then
-            # Manual release - create GitHub release directly
-            gh release create "${{ needs.determine-version.outputs.tag }}" \
-              --title "Release ${{ needs.determine-version.outputs.version }}" \
-              --notes "${{ needs.determine-version.outputs.changelog }}" \
-              ${{ inputs.prerelease && '--prerelease' || '' }} \
-              ${{ inputs.draft && '--draft' || '' }} \
-              ./releases/*
-          else
-            # Use semantic-release for automated releases
-            npx semantic-release
-          fi
-
-  update-homebrew:
-    name: Update Homebrew Formula
-    runs-on: ubuntu-latest
-    needs: [determine-version, release]
-    if: needs.determine-version.outputs.should-release == 'true' && !inputs.prerelease
-    steps:
-      - name: Update Homebrew formula
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Homebrew formula update would go here"
-          echo "Version: ${{ needs.determine-version.outputs.version }}"
-          echo "Tag: ${{ needs.determine-version.outputs.tag }}"
-          # This would typically update a homebrew-tap repository
-          # or submit a PR to homebrew/homebrew-core
+          name: rust-${{ matrix.name }}
+          path: dist/
