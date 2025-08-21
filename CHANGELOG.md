@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/jdfalk/copilot-agent-util-rust/compare/v1.4.0...v1.4.1) (2025-08-21)
+
+
+### Bug Fixes
+
+* **release:** proper token usage and file separation in Rust release workflow ([b4cb6f5](https://github.com/jdfalk/copilot-agent-util-rust/commit/b4cb6f5f8743f6b0591616fa73e730590279ce19))
+
 ## [1.4.0](https://github.com/jdfalk/copilot-agent-util-rust/compare/v1.3.0...v1.4.0) (2025-08-21)
 
 

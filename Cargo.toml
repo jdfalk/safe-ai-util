@@ -1,6 +1,6 @@
 [package]
 name = "copilot-agent-util"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 authors = ["jdfalk <jdfalk@users.noreply.github.com>"]
 license = "MIT"
