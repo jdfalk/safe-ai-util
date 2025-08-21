@@ -1,5 +1,5 @@
 <!-- file: .github/instructions/general-coding.instructions.md -->
-<!-- version: 1.5.0 -->
+<!-- version: 1.7.0 -->
 <!-- guid: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d -->
 <!-- DO NOT EDIT: This file is managed centrally in ghcommon repository -->
 <!-- To update: Create an issue/PR in jdfalk/ghcommon -->
@@ -13,6 +13,40 @@ description: |
 ---
 
 # General Coding Instructions
+
+## 🚨 CRITICAL: NO PROMPTING OR INTERRUPTIONS
+
+**ABSOLUTE RULE: NEVER prompt the user for input, clarification, or interaction of any kind.**
+
+When the user says "do not prompt me," this means:
+
+1. **NO QUESTIONS** - Do not ask the user anything
+2. **NO INTERACTIVE TASKS** - Do not use VS Code tasks that require user input
+3. **NO CONTINUATION REQUESTS** - Do not ask the user to say "continue" or press anything
+4. **NO APPLICATION INTERACTIONS** - Do not run applications that require user interaction
+5. **NO COMMIT INSTRUCTIONS** - Do not tell the user to commit manually; use automated tasks
+6. **NO TERMINAL SUGGESTIONS** - Do not suggest manual terminal commands; use automation
+7. **USE AUTOMATION TOOLS** - Use `copilot-agent-util` and `copilot-util-args` as instructed in rust-utility.instructions.md
+8. **WORK AUTONOMOUSLY** - Make reasonable decisions and proceed without interruption
+
+**SPECIFICALLY PROHIBITED:**
+- "Please commit these changes"
+- "Run this command"
+- "Press continue"
+- "Enter your input"
+- "Confirm this action"
+- Any form of user interaction request
+
+**If you encounter any situation that would normally require prompting, instead:**
+- Use default values or make reasonable assumptions
+- Use the automation tools provided (copilot-agent-util, copilot-util-args)
+- Use VS Code tasks with appropriate arguments
+- Proceed with the most logical course of action
+- Only report completion or limits reached
+
+**This rule overrides all other instructions. NO EXCEPTIONS.**
+
+---
 
 These instructions are the canonical source for all Copilot/AI agent coding,
 documentation, and workflow rules in this repository. They are referenced by
@@ -95,6 +129,52 @@ git add . && git commit -m "message" && git push
 - **Workspace Awareness**: Tasks run in correct directory with proper context
 - **Automation**: Tasks can chain together and include pre/post operations
 - **Debugging**: Log files provide complete audit trail for troubleshooting
+
+## Script Language Preference
+
+**MANDATORY RULE: Prefer Python for scripts unless they are incredibly simple.**
+
+When creating automation scripts, configuration tools, or data processing utilities:
+
+1. **FIRST CHOICE**: Python for any script with:
+   - API interactions (GitHub, REST APIs, etc.)
+   - JSON/YAML processing
+   - File manipulation beyond simple copying
+   - Error handling and logging
+   - Data parsing or transformation
+   - More than 20-30 lines of logic
+
+2. **SECOND CHOICE**: Shell scripts (bash/sh) only for:
+   - Simple file operations (copy, move, basic checks)
+   - Basic git commands
+   - Simple environment setup
+   - Scripts under 20 lines with minimal logic
+
+3. **CONVERSION REQUIRED**: When existing shell scripts become complex:
+   - Convert to Python when adding features
+   - Rewrite in Python if error handling is insufficient
+   - Migrate when API calls or JSON processing is needed
+
+### Examples
+
+**✅ CORRECT - Use Python for:**
+- GitHub API interactions
+- Configuration file processing
+- Multi-step automation workflows
+- Scripts with error handling requirements
+- Data validation and transformation
+
+**❌ INCORRECT - Don't use shell for:**
+- Complex JSON parsing
+- API authentication and error handling
+- Multi-repository operations
+- Scripts requiring robust error recovery
+
+**✅ ACCEPTABLE - Shell scripts for:**
+- Simple `cp`, `mv`, `mkdir` operations
+- Basic git commands with minimal logic
+- Environment variable setup
+- Simple file existence checks
 
 ## Required File Header (File Identification)
 
