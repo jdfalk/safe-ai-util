@@ -15,7 +15,6 @@ REPOS=(
     "../../../gcommon"
     "../../../apt-cacher-go"
     "../../../audiobook-organizer"
-    "../../../merge-srt-subtitles"
     "../../../subtitle-manager"
 )
 
