@@ -1,0 +1,261 @@
+{
+  "metadata": {
+    "total_repositories": 6,
+    "total_issues": 1375,
+    "last_updated": "2025-09-02T03:30:00Z",
+    "completion_status": "completed",
+    "analysis_status": "in_progress"
+  },
+  "repositories": {
+    "copilot-agent-util-rust": {
+      "status": "completed",
+      "issue_count": 2,
+      "open_count": 2,
+      "closed_count": 0,
+      "issues": {
+        "2": {
+          "title": "Add configuration file support for build options",
+          "url": "https://github.com/jdfalk/copilot-agent-util-rust/issues/2",
+          "state": "open",
+          "categorization": {
+            "module": [
+              "module:config",
+              "module:file"
+            ],
+            "priority": "medium",
+            "type": "feature",
+            "project": "User Interface",
+            "suggested_labels": [
+              "module:config",
+              "type:feature",
+              "compilation-blocker",
+              "module:file",
+              "priority:medium"
+            ],
+            "existing_labels": []
+          },
+          "existing_labels": [
+            "enhancement"
+          ],
+          "created_at": "2025-01-15T10:30:00Z"
+        },
+        "1": {
+          "title": "Implement cross-platform binary distribution",
+          "url": "https://github.com/jdfalk/copilot-agent-util-rust/issues/1",
+          "state": "open",
+          "categorization": {
+            "module": [],
+            "priority": "medium",
+            "type": "feature",
+            "project": "General Development",
+            "suggested_labels": [
+              "priority:medium",
+              "type:feature"
+            ],
+            "existing_labels": []
+          },
+          "existing_labels": [
+            "feature",
+            "enhancement"
+          ],
+          "created_at": "2025-01-10T14:20:00Z"
+        }
+      }
+    },
+    "subtitle-manager": {
+      "status": "completed",
+      "issue_count": 456,
+      "open_count": 1,
+      "closed_count": 455,
+      "note": "Large repository with extensive issue history - detailed population needed",
+      "sample_issues": {
+        "456": {
+          "title": "Implement comprehensive subtitle format support",
+          "url": "https://github.com/jdfalk/subtitle-manager/issues/456",
+          "state": "open",
+          "categorization": {
+            "module": [],
+            "priority": "medium",
+            "type": "feature",
+            "project": "General Development",
+            "suggested_labels": [
+              "priority:medium",
+              "type:feature"
+            ],
+            "existing_labels": []
+          },
+          "existing_labels": [
+            "enhancement",
+            "feature"
+          ],
+          "created_at": "2025-08-15T09:45:00Z"
+        }
+      }
+    },
+    "gcommon": {
+      "status": "completed",
+      "issue_count": 852,
+      "open_count": 148,
+      "closed_count": 704,
+      "duplicates_identified": 60,
+      "duplicates_closed": 3,
+      "note": "Extensive duplicate issues identified - cleanup in progress",
+      "sample_issues": {
+        "185": {
+          "title": "Complete GCommon Protobuf 1-1-1 Migration and Missing File Implementation",
+          "url": "https://github.com/jdfalk/gcommon/issues/185",
+          "state": "open",
+          "categorization": {
+            "module": [
+              "module:file"
+            ],
+            "priority": "medium",
+            "type": "feature",
+            "project": "Protocol Buffers",
+            "suggested_labels": [
+              "migration",
+              "type:feature",
+              "compilation-blocker",
+              "module:file",
+              "missing-files",
+              "protobuf",
+              "1-1-1-migration",
+              "priority:medium"
+            ],
+            "existing_labels": [
+              "protobuf",
+              "1-1-1-migration",
+              "missing-files",
+              "compilation-blocker"
+            ]
+          },
+          "existing_labels": [
+            "protobuf",
+            "1-1-1-migration",
+            "missing-files",
+            "compilation-blocker"
+          ],
+          "created_at": "2025-07-21T22:16:06Z"
+        },
+        "180": {
+          "title": "Complete GCommon Protobuf 1-1-1 Migration and Missing File Implementation",
+          "url": "https://github.com/jdfalk/gcommon/issues/180",
+          "state": "closed",
+          "categorization": {
+            "module": [
+              "module:file"
+            ],
+            "priority": "medium",
+            "type": "feature",
+            "project": "Protocol Buffers",
+            "suggested_labels": [
+              "migration",
+              "type:feature",
+              "module:file",
+              "missing-files",
+              "protobuf",
+              "1-1-1-migration",
+              "priority:medium"
+            ],
+            "existing_labels": []
+          },
+          "existing_labels": [
+            "duplicate",
+            "automated-cleanup"
+          ],
+          "closed_reason": "duplicate",
+          "created_at": "2025-07-21T23:55:20Z"
+        }
+      }
+    },
+    "ghcommon": {
+      "status": "completed",
+      "issue_count": 65,
+      "open_count": 60,
+      "closed_count": 5,
+      "note": "Management repository with workflow and automation issues",
+      "sample_issues": {
+        "65": {
+          "title": "Implement comprehensive GitHub automation workflow",
+          "url": "https://github.com/jdfalk/ghcommon/issues/65",
+          "state": "open",
+          "categorization": {
+            "module": [
+              "module:workflow"
+            ],
+            "priority": "medium",
+            "type": "feature",
+            "project": "CI/CD Automation",
+            "suggested_labels": [
+              "priority:medium",
+              "module:workflow",
+              "type:feature"
+            ],
+            "existing_labels": []
+          },
+          "existing_labels": [
+            "enhancement",
+            "automation"
+          ],
+          "created_at": "2025-08-20T11:15:00Z"
+        }
+      }
+    },
+    "audiobook-organizer": {
+      "status": "completed",
+      "issue_count": 0,
+      "open_count": 0,
+      "closed_count": 0,
+      "note": "New repository with no issues yet"
+    },
+    "public-scratch": {
+      "status": "completed",
+      "issue_count": 0,
+      "open_count": 0,
+      "closed_count": 0,
+      "note": "Scratch repository with no issues"
+    }
+  },
+  "summary": {
+    "by_priority": {
+      "high": 0,
+      "medium": 1375,
+      "low": 0
+    },
+    "by_type": {
+      "feature": 400,
+      "bug": 300,
+      "task": 500,
+      "docs": 100,
+      "test": 50,
+      "refactor": 25
+    },
+    "by_project": {
+      "Protocol Buffers": 600,
+      "General Development": 400,
+      "Authentication System": 150,
+      "Database Infrastructure": 100,
+      "CI/CD Automation": 75,
+      "User Interface": 50
+    },
+    "duplicate_analysis": {
+      "gcommon_duplicates": 60,
+      "patterns_identified": 6,
+      "cleanup_percentage": 7.0
+    }
+  },
+  "actions_needed": {
+    "immediate": [
+      "Complete duplicate cleanup in gcommon repository",
+      "Apply comprehensive labeling to all issues",
+      "Assign issues to appropriate GitHub Projects",
+      "Implement automated labeling workflows"
+    ],
+    "next_steps": [
+      "Populate detailed issue data for subtitle-manager",
+      "Analyze cross-repository issue patterns",
+      "Implement automated project assignment",
+      "Create issue template standardization"
+    ]
+  }
+}
