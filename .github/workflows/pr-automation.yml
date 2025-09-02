@@ -1,0 +1,66 @@
+# file: .github/workflows/pr-automation.yml
+# version: 1.0.0
+# guid: a7b8c9d0-e1f2-3456-a789-0123456789bc
+
+name: PR Automation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: write
+  statuses: write
+  actions: write
+  packages: read
+  id-token: write
+  repository-projects: write
+
+jobs:
+  auto-labeling:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Apply file-based labels
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          sync-labels: true
+
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Super Linter CI
+        uses: super-linter/super-linter@v6
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_RUST_2015: false
+          VALIDATE_RUST_2018: false
+          VALIDATE_RUST_2021: true
+          VALIDATE_YAML: true
+          VALIDATE_JSON: true
+          VALIDATE_MARKDOWN: true
+          VALIDATE_BASH: true
+          VALIDATE_DOCKERFILE_HADOLINT: true
+          FILTER_REGEX_EXCLUDE: ".*\\.git/.*|.*\\.github/copilot/.*|.*\\.vscode/.*|.*node_modules/.*|.*\\.cache/.*|.*vendor/.*|.*dist/.*|.*target/.*"
