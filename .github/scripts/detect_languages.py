@@ -36,10 +36,9 @@ else:
 go_matrix = (
     {
         "include": [
-            {"os": "ubuntu-latest", "go-version": "1.23", "primary": True},
-            {"os": "ubuntu-latest", "go-version": "1.22", "primary": False},
-            {"os": "macos-latest", "go-version": "1.23", "primary": False},
-            {"os": "windows-latest", "go-version": "1.23", "primary": False},
+            {"os": "ubuntu-latest", "go-version": "1.24", "primary": False},
+            {"os": "macos-latest", "go-version": "1.24", "primary": False},
+            {"os": "windows-latest", "go-version": "1.24", "primary": False},
         ]
     }
     if has_go
@@ -49,11 +48,9 @@ go_matrix = (
 python_matrix = (
     {
         "include": [
-            {"os": "ubuntu-latest", "python-version": "3.12", "primary": True},
-            {"os": "ubuntu-latest", "python-version": "3.11", "primary": False},
-            {"os": "ubuntu-latest", "python-version": "3.13", "primary": False},
-            {"os": "macos-latest", "python-version": "3.12", "primary": False},
-            {"os": "windows-latest", "python-version": "3.12", "primary": False},
+            {"python-version": "3.13", "os": "ubuntu-latest", "primary": True},
+            {"python-version": "3.13", "os": "macos-latest", "primary": False},
+            {"python-version": "3.13", "os": "windows-latest", "primary": False},
         ]
     }
     if has_python
