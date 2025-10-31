@@ -1,5 +1,5 @@
-<!-- file: .github/instructions/rust-utility.instructions.md -->
-<!-- version: 1.2.1 -->
+<!-- file: .github/instructions/safe-ai-util.instructions.md -->
+<!-- version: 2.0.0 -->
 <!-- guid: a1b2c3d4-e5f6-7890-1234-567890abcdef -->
 
 <!-- prettier-ignore-start -->
@@ -8,68 +8,77 @@
 
 applyTo: "\*\*"
 description: |
-Instructions for using the copilot-agent-util Rust utility as the primary tool for development operations. This utility provides superior performance, memory safety, and comprehensive command coverage compared to manual terminal commands.
+Instructions for using the safe-ai-util Rust utility as the primary tool for development operations. This utility provides superior performance, memory safety, and comprehensive command coverage compared to manual terminal commands. Note: The utility was previously named safe-ai-util and both binary names are supported for backward compatibility.
 
 ---
 <!-- markdownlint-enable -->
 <!-- prettier-ignore-end -->
 
-# Copilot Agent Utility (Rust) - Installation and Command Reference
+# Safe AI Utility (Rust) - Installation and Command Reference
 
 ## 📥 Installation
 
 ### Option 1: Download from GitHub Releases (Recommended)
 
-**Download from:** https://github.com/jdfalk/copilot-agent-util-rust/releases
+**Download from:** https://github.com/jdfalk/safe-ai-util/releases
 
 Available binaries for:
-- **macOS**: `copilot-agent-util-macos-arm64` and `copilot-agent-util-macos-x86_64`
-- **Linux**: `copilot-agent-util-linux-arm64` and `copilot-agent-util-linux-x86_64`
-- **Windows**: `copilot-agent-util-windows-x86_64.exe`
+- **macOS**: `safe-ai-util-macos-arm64` and `safe-ai-util-macos-x86_64`
+- **Linux**: `safe-ai-util-linux-arm64` and `safe-ai-util-linux-x86_64`
+- **Windows**: `safe-ai-util-windows-x86_64.exe`
 
 ```bash
 # Example installation on macOS ARM64:
-curl -L -o copilot-agent-util https://github.com/jdfalk/copilot-agent-util-rust/releases/latest/download/copilot-agent-util-macos-arm64
-chmod +x copilot-agent-util
-sudo mv copilot-agent-util /usr/local/bin/
+curl -L -o safe-ai-util https://github.com/jdfalk/safe-ai-util/releases/latest/download/safe-ai-util-macos-arm64
+chmod +x safe-ai-util
+sudo mv safe-ai-util /usr/local/bin/
+
+# For backward compatibility, the safe-ai-util binary name is also available:
+# curl -L -o safe-ai-util https://github.com/jdfalk/safe-ai-util/releases/latest/download/safe-ai-util-macos-arm64
 ```
 
 ### Option 2: Build from Source
 
-**Source code:** https://github.com/jdfalk/copilot-agent-util-rust
+**Source code:** https://github.com/jdfalk/safe-ai-util
 
 ```bash
 # Clone and build
-git clone https://github.com/jdfalk/copilot-agent-util-rust
-cd copilot-agent-util-rust
+git clone https://github.com/jdfalk/safe-ai-util
+cd safe-ai-util
 cargo build --release
-cp target/release/copilot-agent-util /usr/local/bin/
+cp target/release/safe-ai-util /usr/local/bin/
+
+# Both binary names are available:
+# cp target/release/safe-ai-util /usr/local/bin/
 ```
 
 ### Option 3: Use Local Copy (Development)
 
-Many repositories include a copy in `tools/copilot-agent-util-rust/`:
+Many repositories include a copy in `tools/safe-ai-util/`:
 
 ```bash
-cd tools/copilot-agent-util-rust
+cd tools/safe-ai-util
 cargo build --release
-cp target/release/copilot-agent-util /usr/local/bin/
+cp target/release/safe-ai-util /usr/local/bin/
 ```
 
 ### Verification
 
 ```bash
 # Verify installation
-copilot-agent-util --version
-# Or alternatively:
-copilot-agent-utilr --version
+safe-ai-util --version
+
+# For backward compatibility, safe-ai-util also works:
+# safe-ai-util --version
 ```
 
-The `copilot-agent-util` (or `copilot-agent-utilr`) is a comprehensive Rust-based development utility that provides superior performance, memory safety, and extensive command coverage. **Always prefer this utility over manual commands when available.**
+The `safe-ai-util` is a comprehensive Rust-based development utility that provides superior performance, memory safety, and extensive command coverage. **Always prefer this utility over manual commands when available.**
 
-## 🚀 NEW: Arguments File Support
+> **Note:** The utility was previously named `safe-ai-util` and both binary names are supported for backward compatibility during the transition period.
 
-The utility now supports loading arguments from a standard configuration file called `copilot-util-args`. This allows for:
+## 🚀 Arguments File Support
+
+The utility supports loading arguments from a standard configuration file called `copilot-util-args` or `safe-ai-util-args`. This allows for:
 
 - **Consistent configuration** across all repositories
 - **Easy updates** by modifying a single file
@@ -78,10 +87,10 @@ The utility now supports loading arguments from a standard configuration file ca
 
 ### Arguments File Location
 
-The utility looks for `copilot-util-args` in the current working directory or any parent directory (similar to how git finds .git). The file format supports:
+The utility looks for `safe-ai-util-args` (or `copilot-util-args` for compatibility) in the current working directory or any parent directory (similar to how git finds .git). The file format supports:
 
 ```bash
-# copilot-util-args - Standard configuration file
+# safe-ai-util-args - Standard configuration file
 # Comments are supported with #
 
 # Git configuration
@@ -106,18 +115,18 @@ log-level=info
 
 ### Using Arguments Files
 
-When a `copilot-util-args` file is present, the utility automatically loads these settings:
+When a `safe-ai-util-args` (or `copilot-util-args`) file is present, the utility automatically loads these settings:
 
 ```bash
 # The utility automatically finds and uses the args file
-copilot-agent-utilr git commit -m "implement feature"
-# Uses git.commit-template and other git.* settings from copilot-util-args
+safe-ai-util git commit -m "implement feature"
+# Uses git.commit-template and other git.* settings from args file
 
-copilot-agent-utilr buf generate
-# Uses buf.* settings from copilot-util-args
+safe-ai-util buf generate
+# Uses buf.* settings from args file
 
-copilot-agent-utilr editor file.rs
-# Uses editor.* settings from copilot-util-args
+safe-ai-util editor file.rs
+# Uses editor.* settings from args file
 ```
 
 ## 🚨 PRIORITY ORDER FOR OPERATIONS
@@ -125,38 +134,38 @@ copilot-agent-utilr editor file.rs
 **MANDATORY: Follow this exact priority when performing ANY operation:**
 
 1. **FIRST**: Use VS Code tasks (via `run_task` tool) when available
-2. **SECOND**: Use `copilot-agent-util` / `copilot-agent-utilr` Rust utility
+2. **SECOND**: Use `safe-ai-util` Rust utility
 3. **LAST RESORT**: Manual terminal commands only if neither above option exists
 
 ## Available Commands
 
 ### 🔧 Git Operations (Comprehensive)
 
-The utility provides **complete git functionality** with 18+ subcommands and automatic configuration from `copilot-util-args`:
+The utility provides **complete git functionality** with 18+ subcommands and automatic configuration from `safe-ai-util-args`:
 
 ```bash
 # Git command structure
-copilot-agent-utilr git <subcommand> [options] [args]
+safe-ai-util git <subcommand> [options] [args]
 
 # Available git subcommands:
-copilot-agent-utilr git add [files...]           # Add files to staging
-copilot-agent-utilr git commit -m "message"      # Commit changes (uses templates from args file)
-copilot-agent-utilr git push                     # Push to remote (respects auto-push setting)
-copilot-agent-utilr git pull                     # Pull from remote
-copilot-agent-utilr git status                   # Show working tree status
-copilot-agent-utilr git branch [name]            # List/create branches
-copilot-agent-utilr git checkout <branch>        # Switch branches
-copilot-agent-utilr git merge <branch>           # Merge branches
-copilot-agent-utilr git rebase <branch>          # Rebase commits
-copilot-agent-utilr git reset [options]          # Reset state
-copilot-agent-utilr git log [options]            # Show commit history
-copilot-agent-utilr git diff [options]           # Show differences
-copilot-agent-utilr git stash [command]          # Stash changes
-copilot-agent-utilr git remote [command]         # Manage remotes
-copilot-agent-utilr git tag [options]            # Manage tags
-copilot-agent-utilr git clone <url>              # Clone repository
-copilot-agent-utilr git fetch                    # Fetch from remote
-copilot-agent-utilr git init                     # Initialize repository
+safe-ai-util git add [files...]           # Add files to staging
+safe-ai-util git commit -m "message"      # Commit changes (uses templates from args file)
+safe-ai-util git push                     # Push to remote (respects auto-push setting)
+safe-ai-util git pull                     # Pull from remote
+safe-ai-util git status                   # Show working tree status
+safe-ai-util git branch [name]            # List/create branches
+safe-ai-util git checkout <branch>        # Switch branches
+safe-ai-util git merge <branch>           # Merge branches
+safe-ai-util git rebase <branch>          # Rebase commits
+safe-ai-util git reset [options]          # Reset state
+safe-ai-util git log [options]            # Show commit history
+safe-ai-util git diff [options]           # Show differences
+safe-ai-util git stash [command]          # Stash changes
+safe-ai-util git remote [command]         # Manage remotes
+safe-ai-util git tag [options]            # Manage tags
+safe-ai-util git clone <url>              # Clone repository
+safe-ai-util git fetch                    # Fetch from remote
+safe-ai-util git init                     # Initialize repository
 ```
 
 **Configuration via copilot-util-args:**
@@ -174,20 +183,20 @@ git.push-default=current
 
 ```bash
 # Status and basic operations
-copilot-agent-utilr git status
-copilot-agent-utilr git add .
-copilot-agent-utilr git commit -m "feat: add new feature"
-copilot-agent-utilr git push
+safe-ai-util git status
+safe-ai-util git add .
+safe-ai-util git commit -m "feat: add new feature"
+safe-ai-util git push
 
 # Branch operations
-copilot-agent-utilr git branch feature-branch
-copilot-agent-utilr git checkout feature-branch
-copilot-agent-utilr git merge main
+safe-ai-util git branch feature-branch
+safe-ai-util git checkout feature-branch
+safe-ai-util git merge main
 
 # Advanced operations
-copilot-agent-utilr git log --oneline -10
-copilot-agent-utilr git diff HEAD~1
-copilot-agent-utilr git stash push -m "WIP changes"
+safe-ai-util git log --oneline -10
+safe-ai-util git diff HEAD~1
+safe-ai-util git stash push -m "WIP changes"
 ```
 
 ### 📝 Text Processing
@@ -198,13 +207,13 @@ Superior Rust implementation of sed with full regex support and configuration fr
 
 ```bash
 # Sed command structure
-copilot-agent-utilr sed [options] [files...]
+safe-ai-util sed [options] [files...]
 
 # Common sed operations:
-echo "text" | copilot-agent-utilr sed -e 's/old/new/g'        # Substitute
-copilot-agent-utilr sed -i -e 's/old/new/g' file.txt         # In-place edit
-copilot-agent-utilr sed -e '/pattern/d' file.txt             # Delete lines
-copilot-agent-utilr sed -e '3,5p' -n file.txt                # Print specific lines
+echo "text" | safe-ai-util sed -e 's/old/new/g'        # Substitute
+safe-ai-util sed -i -e 's/old/new/g' file.txt         # In-place edit
+safe-ai-util sed -e '/pattern/d' file.txt             # Delete lines
+safe-ai-util sed -e '3,5p' -n file.txt                # Print specific lines
 ```
 
 **Configuration via copilot-util-args:**
@@ -230,12 +239,12 @@ Complete AWK interpreter with pattern matching, field processing, and configurat
 
 ```bash
 # AWK command structure
-copilot-agent-utilr awk 'program' [files...]
+safe-ai-util awk 'program' [files...]
 
 # Common AWK operations:
-echo "one two three" | copilot-agent-utilr awk '{print $2}'  # Print second field
-copilot-agent-utilr awk '/pattern/ {print $0}' file.txt      # Pattern matching
-copilot-agent-utilr awk 'BEGIN{sum=0} {sum+=$1} END{print sum}' numbers.txt
+echo "one two three" | safe-ai-util awk '{print $2}'  # Print second field
+safe-ai-util awk '/pattern/ {print $0}' file.txt      # Pattern matching
+safe-ai-util awk 'BEGIN{sum=0} {sum+=$1} END{print sum}' numbers.txt
 ```
 
 **Configuration via copilot-util-args:**
@@ -261,7 +270,7 @@ Superior Rust-powered terminal editor with advanced features and extensive confi
 
 ```bash
 # Editor command structure
-copilot-agent-utilr editor <file> [options]
+safe-ai-util editor <file> [options]
 
 # Editor options:
 -l, --line <NUMBER>      # Start at specific line
@@ -299,13 +308,13 @@ Comprehensive protocol buffer tooling with configuration support:
 
 ```bash
 # Buf command structure
-copilot-agent-utilr buf <subcommand> [options]
+safe-ai-util buf <subcommand> [options]
 
 # Available buf subcommands:
-copilot-agent-utilr buf generate                 # Generate code from proto files
-copilot-agent-utilr buf lint                     # Lint proto files
-copilot-agent-utilr buf format                   # Format proto files
-copilot-agent-utilr buf build                    # Build proto modules
+safe-ai-util buf generate                 # Generate code from proto files
+safe-ai-util buf lint                     # Lint proto files
+safe-ai-util buf format                   # Format proto files
+safe-ai-util buf build                    # Build proto modules
 ```
 
 **Configuration via copilot-util-args:**
@@ -324,12 +333,12 @@ Execute arbitrary commands with enhanced logging and configuration:
 
 ```bash
 # Exec command structure
-copilot-agent-utilr exec <command> [args...]
+safe-ai-util exec <command> [args...]
 
 # Examples:
-copilot-agent-utilr exec go build ./...
-copilot-agent-utilr exec npm install
-copilot-agent-utilr exec cargo test
+safe-ai-util exec go build ./...
+safe-ai-util exec npm install
+safe-ai-util exec cargo test
 ```
 
 **Configuration via copilot-util-args:**
@@ -347,21 +356,21 @@ Many repositories have VS Code tasks that use the Rust utility with automatic co
 
 ```bash
 # Example task usage (preferred method):
-run_task("Git Status", "/path/to/workspace")           # Uses copilot-agent-utilr with args file
-run_task("Git Add All", "/path/to/workspace")          # Uses copilot-agent-utilr with args file
-run_task("Git Commit", "/path/to/workspace")           # Uses copilot-agent-utilr with args file
-run_task("Buf Generate with Output", "/path/to/workspace")  # Uses copilot-agent-utilr with args file
+run_task("Git Status", "/path/to/workspace")           # Uses safe-ai-util with args file
+run_task("Git Add All", "/path/to/workspace")          # Uses safe-ai-util with args file
+run_task("Git Commit", "/path/to/workspace")           # Uses safe-ai-util with args file
+run_task("Buf Generate with Output", "/path/to/workspace")  # Uses safe-ai-util with args file
 ```
 
 ### Updating VS Code Tasks for Arguments File Support
 
-Tasks should be updated to use the utility without explicit arguments, allowing the `copilot-util-args` file to provide configuration:
+Tasks should be updated to use the utility without explicit arguments, allowing the `safe-ai-util-args` (or `copilot-util-args`) file to provide configuration:
 
 ```json
 {
   "label": "Git Add All",
   "type": "shell",
-  "command": "copilot-agent-util",
+  "command": "safe-ai-util",
   "args": ["git", "add"],
   "options": {
     "cwd": "${workspaceFolder}"
@@ -369,7 +378,7 @@ Tasks should be updated to use the utility without explicit arguments, allowing 
 }
 ```
 
-The utility will automatically find and load the `copilot-util-args` file from the workspace directory.
+The utility will automatically find and load the `safe-ai-util-args` or `copilot-util-args` file from the workspace directory.
 
 ## 📋 Usage Priority Examples
 
@@ -380,7 +389,7 @@ The utility will automatically find and load the `copilot-util-args` file from t
 run_task("Git Status", "/path/to/workspace")
 
 # ✅ GOOD: Use Rust utility directly
-copilot-agent-utilr git status
+safe-ai-util git status
 
 # ❌ AVOID: Manual git command
 git status
@@ -390,8 +399,8 @@ git status
 
 ```bash
 # ✅ BEST: Use Rust utility
-echo "data" | copilot-agent-utilr sed -e 's/old/new/'
-echo "fields" | copilot-agent-utilr awk '{print $2}'
+echo "data" | safe-ai-util sed -e 's/old/new/'
+echo "fields" | safe-ai-util awk '{print $2}'
 
 # ❌ AVOID: Manual commands
 echo "data" | sed 's/old/new/'
@@ -402,7 +411,7 @@ echo "fields" | awk '{print $2}'
 
 ```bash
 # ✅ BEST: Use Rust editor
-copilot-agent-utilr editor myfile.rs --syntax rust
+safe-ai-util editor myfile.rs --syntax rust
 
 # ❌ AVOID: Manual editors
 nano myfile.rs
@@ -426,7 +435,7 @@ Create a `copilot-util-args` file in your repository root for consistent configu
 
 ```bash
 # Create standard copilot-util-args file
-copilot-agent-utilr editor copilot-util-args
+safe-ai-util editor copilot-util-args
 
 # Or create manually:
 cat > copilot-util-args << 'EOF'
@@ -483,13 +492,13 @@ echo "log-level=debug" >> copilot-util-args
 
 ```bash
 # Complex git workflow
-copilot-agent-utilr git add .
-copilot-agent-utilr git commit -m "feat: implement new feature"
-copilot-agent-utilr git push
+safe-ai-util git add .
+safe-ai-util git commit -m "feat: implement new feature"
+safe-ai-util git push
 
 # Text processing pipeline
-copilot-agent-utilr sed -e 's/old/new/g' input.txt | \
-copilot-agent-utilr awk '{print $1, $3}' > output.txt
+safe-ai-util sed -e 's/old/new/g' input.txt | \
+safe-ai-util awk '{print $1, $3}' > output.txt
 ```
 
 ### Error Handling
@@ -505,12 +514,12 @@ The Rust utility provides superior error messages and handling:
 
 | Category        | Command                                | Purpose                                           |
 | --------------- | -------------------------------------- | ------------------------------------------------- |
-| Git             | `copilot-agent-utilr git <subcommand>` | Complete git operations (18+ subcommands)         |
-| Text Processing | `copilot-agent-utilr sed <options>`    | Stream editing with regex support                 |
-| Text Processing | `copilot-agent-utilr awk '<program>'`  | Pattern processing and field extraction           |
-| Editing         | `copilot-agent-utilr editor <file>`    | Superior terminal editor with syntax highlighting |
-| Protocol Buffers| `copilot-agent-utilr buf <subcommand>` | Comprehensive protobuf tooling                   |
-| Command Execution| `copilot-agent-utilr exec <command>`  | Execute arbitrary commands with enhanced logging  |
+| Git             | `safe-ai-util git <subcommand>` | Complete git operations (18+ subcommands)         |
+| Text Processing | `safe-ai-util sed <options>`    | Stream editing with regex support                 |
+| Text Processing | `safe-ai-util awk '<program>'`  | Pattern processing and field extraction           |
+| Editing         | `safe-ai-util editor <file>`    | Superior terminal editor with syntax highlighting |
+| Protocol Buffers| `safe-ai-util buf <subcommand>` | Comprehensive protobuf tooling                   |
+| Command Execution| `safe-ai-util exec <command>`  | Execute arbitrary commands with enhanced logging  |
 | Configuration   | `copilot-util-args` file               | Automatic configuration loading for all commands  |
 
 **Remember: Always use VS Code tasks first, then the Rust utility, and manual commands only as a last resort.**
