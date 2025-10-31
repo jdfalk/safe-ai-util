@@ -1,8 +1,68 @@
 <!-- file: TODO.md -->
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 <!-- guid: c5a2bbd9-63e2-4593-8dd9-a8a3d52f18b3 -->
 
 # TODO: Copilot Agent Utility - Rust Implementation
+
+## 🚀 ACTIVE MIGRATION: Rename & MCP Server Creation (2025-10-30)
+
+-### Objective 1: Create safe-ai-util-mcp Repository
+
+- [x] Create new GitHub repo `safe-ai-util-mcp` using gh CLI
+- [x] Configure repo settings:
+  - [x] Enable rebase-only merging (disable merge commits and squash)
+  - [x] Enable "Always suggest updating pull requests"
+  - [x] Enable auto-merge
+  - [x] Enable automatic head branch deletion
+  - [x] Create ruleset to protect main branch from deletion
+- [x] Clone repository locally
+- [x] Initial commit with basic structure
+
+### Objective 2: Rename copilot-agent-util-rust → safe-ai-util
+
+- [ ] Rename GitHub repository via gh CLI or web UI
+- [ ] Update all references in codebase:
+  - [ ] Cargo.toml package name and metadata
+  - [ ] README.md references and links
+  - [ ] CHANGELOG.md repository URLs
+  - [ ] All workflow files (.github/workflows/)
+  - [ ] Documentation files
+  - [ ] Install/distribution scripts
+- [ ] Update binary name in build outputs
+- [ ] Test that GitHub redirects work (old → new)
+- [ ] Update release artifacts naming
+- [ ] Communicate rename to users (if any)
+
+### Objective 3: Implement MCP Server in safe-ai-util-mcp
+
+- [ ] Scaffold Python project structure:
+  - [ ] pyproject.toml with mcp SDK dependency
+  - [ ] src/safe_ai_util_mcp/ package structure
+  - [ ] server.py with stdio transport
+  - [ ] README.md with installation and usage
+  - [ ] .gitignore for Python
+- [ ] Implement MCP tool wrappers:
+  - [ ] git_status, git_add, git_commit, git_push
+  - [ ] buf_lint, buf_generate
+  - [ ] python_venv_ensure, python_venv_remove
+  - [ ] python_pip_install, python_run_pytest
+- [ ] Add security enforcement:
+  - [ ] Path validation (workspace boundaries)
+  - [ ] Argument sanitization
+  - [ ] Timeout enforcement
+  - [ ] Environment variable stripping
+- [ ] Create comprehensive documentation:
+  - [ ] Client configuration examples (Claude, Continue.dev)
+  - [ ] Tool schema documentation
+  - [ ] Security model explanation
+- [ ] Add tests:
+  - [ ] Unit tests for tool handlers
+  - [ ] Integration tests with mocked binary
+  - [ ] Security validation tests
+- [ ] Set up CI/CD:
+  - [ ] Lint and format checks
+  - [ ] Test execution
+  - [ ] Optional: PyPI publishing workflow
 
 ## Core Safety Features
 

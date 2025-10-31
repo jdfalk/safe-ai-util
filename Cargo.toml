@@ -1,6 +1,6 @@
 [package]
 name = "copilot-agent-util"
-version = "1.4.1"
+version = "1.4.2"
 edition = "2021"
 authors = ["jdfalk <jdfalk@users.noreply.github.com>"]
 license = "MIT"
@@ -14,6 +14,12 @@ rust-version = "1.70"
 
 [[bin]]
 name = "copilot-agent-util"
+path = "src/main.rs"
+
+# Transitional alias to enable zero-downtime rename to "safe-ai-util".
+# Both binaries are built from the same entrypoint to avoid breaking existing tasks.
+[[bin]]
+name = "safe-ai-util"
 path = "src/main.rs"
 
 [dependencies]

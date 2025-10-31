@@ -1,5 +1,43 @@
-## [1.4.1](https://github.com/jdfalk/copilot-agent-util-rust/compare/v1.4.0...v1.4.1) (2025-08-21)
+# Changelog
 
+## [Unreleased] - 2025-10-30
+
+### 🚀 Major Changes - Repository Rename & MCP Server
+
+#### Breaking Changes
+
+* **repo:** Renamed repository from `copilot-agent-util-rust` to `safe-ai-util`
+  * Binary name updated from `copilot-agent-util` to `safe-ai-util`
+  * Package name in Cargo.toml updated
+  * All documentation and workflow references updated
+  * GitHub automatically redirects old URLs to new repository
+
+### Features
+
+* **python:** Add comprehensive venv, pip, and pytest workflow support
+  * New `python venv ensure` command for cross-platform venv creation
+  * New `python venv remove` command with safety guards
+  * New `python pip install` command with requirements.txt support
+  * New `python run pytest` command for test execution
+  * Cross-platform venv resolution without shell activation required
+  * Safety guards: refuse global pip by default, guarded venv removal, sanitized environment
+  * Enhanced CLI help documentation with detailed examples
+
+* **mcp:** New companion repository `safe-ai-util-mcp` created
+  * Python-based MCP server using official ModelContext Protocol SDK
+  * Exposes all safe-ai-util capabilities as MCP tools
+  * Stdio transport for compatibility with Claude Desktop, Continue.dev, and GitHub Copilot
+  * Tool wrappers for git, buf, and python commands
+  * Comprehensive security enforcement and timeout handling
+  * Repository: <https://github.com/jdfalk/safe-ai-util-mcp>
+
+### Documentation
+
+* Enhanced README with Python workflows section
+* Updated all references to new repository name
+* Added migration guide for existing users
+
+## [1.4.1](https://github.com/jdfalk/copilot-agent-util-rust/compare/v1.4.0...v1.4.1) (2025-08-21)
 
 ### Bug Fixes
 
@@ -53,21 +91,27 @@
 
 ## Table of Contents
 
-- [file: CHANGELOG.md](#file-changelog-md)
-  - [Table of Contents](#table-of-contents)
-- [version: 1.0.0](#version-1-0-0)
-- [guid: 6f789012-bcde-f345-6789-0123456789ab](#guid-6f789012-bcde-f345-6789-0123456789ab)
 - [Changelog](#changelog)
-  - [[1.0.0] - 2025-08-08](#-1-0-0-2025-08-08)
+  - [\[Unreleased\] - 2025-10-30](#unreleased---2025-10-30)
+    - [🚀 Major Changes - Repository Rename \& MCP Server](#-major-changes---repository-rename--mcp-server)
+      - [Breaking Changes](#breaking-changes)
+    - [Features](#features)
+    - [Documentation](#documentation)
+  - [1.4.1 (2025-08-21)](#141-2025-08-21)
+    - [Bug Fixes](#bug-fixes)
+  - [1.4.0 (2025-08-21)](#140-2025-08-21)
+    - [Features](#features-1)
+    - [Bug Fixes](#bug-fixes-1)
+- [file: CHANGELOG.md](#file-changelogmd)
+  - [Table of Contents](#table-of-contents)
+  - [\[1.0.0\] - 2025-08-08](#100---2025-08-08)
     - [Added](#added)
     - [Technical Features](#technical-features)
     - [Security](#security)
-    - [Documentation](#documentation)
-  - [[Unreleased]](#-unreleased)
+    - [Documentation](#documentation-1)
+  - [\[Unreleased\]](#unreleased)
     - [Coming Soon](#coming-soon)
   - [Release Notes](#release-notes)
-- [From GitHub releases](#from-github-releases)
-- [From Docker](#from-docker)
 
 ## [1.0.0] - 2025-08-08
 

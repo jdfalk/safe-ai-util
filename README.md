@@ -1,37 +1,42 @@
 <!-- file: README.md -->
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
+# Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation
+
+> Note: We're transitioning the project name from "copilot-agent-util" to "safe-ai-util". For zero interruption, both binary names are built and supported. You can continue using `copilot-agent-util` or start using `safe-ai-util` today.
+
 ## Table of Contents
 
-- [Table of Contents](#table-of-contents)
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-  - [From Cargo](#from-cargo)
-  - [From GitHub](#from-github)
-  - [From Binary Releases](#from-binary-releases)
-- [Usage](#usage)
-- [Command Categories](#command-categories)
-  - [File Operations](#file-operations)
-  - [Git Operations](#git-operations)
-  - [Protocol Buffers](#protocol-buffers)
-  - [Development Tools](#development-tools)
-  - [System Operations](#system-operations)
-- [Safety Features](#safety-features)
-  - [Command Validation](#command-validation)
-  - [Error Recovery](#error-recovery)
-  - [Concurrent Safety](#concurrent-safety)
-- [Configuration](#configuration)
-  - [Configuration Example](#configuration-example)
-- [Logging](#logging)
-  - [Log Levels](#log-levels)
-- [VS Code Integration](#vs-code-integration)
-- [Performance](#performance)
-- [Development](#development)
-  - [Building from Source](#building-from-source)
-  - [Contributing](#contributing)
-  - [Architecture](#architecture)
-- [License](#license)
-- [Security](#security)
+- [Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation](#copilot-agent-utility-renaming-to-safe-ai-util---rust-implementation)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Features](#features)
+  - [Installation](#installation)
+    - [From Cargo](#from-cargo)
+    - [From GitHub](#from-github)
+    - [From Binary Releases](#from-binary-releases)
+  - [Usage](#usage)
+  - [Command Categories](#command-categories)
+    - [File Operations](#file-operations)
+    - [Git Operations](#git-operations)
+    - [Protocol Buffers](#protocol-buffers)
+    - [Development Tools](#development-tools)
+    - [System Operations](#system-operations)
+  - [Safety Features](#safety-features)
+    - [Command Validation](#command-validation)
+    - [Error Recovery](#error-recovery)
+    - [Concurrent Safety](#concurrent-safety)
+  - [Configuration](#configuration)
+    - [Configuration Example](#configuration-example)
+  - [Logging](#logging)
+    - [Log Levels](#log-levels)
+  - [VS Code Integration](#vs-code-integration)
+  - [Performance](#performance)
+  - [Development](#development)
+    - [Building from Source](#building-from-source)
+    - [Contributing](#contributing)
+    - [Architecture](#architecture)
+  - [License](#license)
+  - [Security](#security)
 
 ## Overview
 
@@ -55,6 +60,9 @@ This Rust application serves as a reliable, safe, and performant intermediary be
 
 ```bash
 cargo install copilot-agent-util
+# During the transition, both binaries are installed:
+# - copilot-agent-util (legacy)
+# - safe-ai-util (new)
 ```
 
 ### From GitHub
@@ -69,21 +77,31 @@ cargo install --path .
 ### From Binary Releases
 
 Download pre-compiled binaries from the [releases page](https://github.com/jdfalk/copilot-agent-util-rust/releases).
+Release artifacts include both names, e.g. `copilot-agent-util-macos-arm64` and `safe-ai-util-macos-arm64`.
 
 ## Usage
 
 ```bash
 # Basic command execution
 copilot-agent-util exec "ls -la"
+# Or using the new name
+safe-ai-util exec "ls -la"
 
 # Git operations
 copilot-agent-util git add .
 copilot-agent-util git commit -m "feat: add new feature"
 copilot-agent-util git push
+# New name equivalent
+safe-ai-util git add .
+safe-ai-util git commit -m "feat: add new feature"
+safe-ai-util git push
 
 # Protocol buffer operations
 copilot-agent-util buf generate
 copilot-agent-util buf generate --module auth
+# New name equivalent
+safe-ai-util buf generate
+safe-ai-util buf generate --module auth
 
 # File operations
 copilot-agent-util file cat README.md
@@ -93,13 +111,22 @@ copilot-agent-util file ls src/
 copilot-agent-util python run script.py
 copilot-agent-util npm install
 copilot-agent-util uv run main.py
+# New name equivalent
+safe-ai-util python run script.py
+safe-ai-util npm install
+safe-ai-util uv run main.py
 
 # Safe operations with dry-run
 copilot-agent-util --dry-run git push --force-with-lease
 copilot-agent-util --dry-run file rm dangerous-file.txt
+# New name equivalent
+safe-ai-util --dry-run git push --force-with-lease
+safe-ai-util --dry-run file rm dangerous-file.txt
 
 # Verbose logging
 copilot-agent-util --verbose buf generate
+# New name equivalent
+safe-ai-util --verbose buf generate
 ```
 
 ## Command Categories
