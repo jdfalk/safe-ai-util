@@ -1,50 +1,37 @@
 <!-- file: README.md -->
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 ## Table of Contents
 
-  - [Table of Contents](#table-of-contents)
-- [Copilot Agent Utility - Rust](#copilot-agent-utility-rust)
-  - [Overview](#overview)
-  - [Features](#features)
-  - [Installation](#installation)
-    - [From Cargo](#from-cargo)
-    - [From GitHub](#from-github)
-    - [From Binary Releases](#from-binary-releases)
-  - [Usage](#usage)
-- [Basic command execution](#basic-command-execution)
-- [Git operations](#git-operations)
-- [Protocol buffer operations](#protocol-buffer-operations)
-- [File operations](#file-operations)
-- [Development tools](#development-tools)
-- [Safe operations with dry-run](#safe-operations-with-dry-run)
-- [Verbose logging](#verbose-logging)
-  - [Command Categories](#command-categories)
-    - [File Operations](#file-operations)
-    - [Git Operations](#git-operations)
-    - [Protocol Buffers](#protocol-buffers)
-    - [Development Tools](#development-tools)
-    - [System Operations](#system-operations)
-  - [Safety Features](#safety-features)
-    - [Command Validation](#command-validation)
-    - [Error Recovery](#error-recovery)
-    - [Concurrent Safety](#concurrent-safety)
-  - [Configuration](#configuration)
-    - [Configuration Example](#configuration-example)
-  - [Logging](#logging)
-    - [Log Levels](#log-levels)
-  - [VS Code Integration](#vs-code-integration)
-  - [Performance](#performance)
-  - [Development](#development)
-    - [Building from Source](#building-from-source)
-- [Debug build](#debug-build)
-- [Release build (optimized)](#release-build-optimized)
-- [Run tests](#run-tests)
-- [Run benchmarks](#run-benchmarks)
-- [Generate documentation](#generate-documentation)
-    - [Contributing](#contributing)
-    - [Architecture](#architecture)
-  - [License](#license)
-  - [Security](#security)
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+  - [From Cargo](#from-cargo)
+  - [From GitHub](#from-github)
+  - [From Binary Releases](#from-binary-releases)
+- [Usage](#usage)
+- [Command Categories](#command-categories)
+  - [File Operations](#file-operations)
+  - [Git Operations](#git-operations)
+  - [Protocol Buffers](#protocol-buffers)
+  - [Development Tools](#development-tools)
+  - [System Operations](#system-operations)
+- [Safety Features](#safety-features)
+  - [Command Validation](#command-validation)
+  - [Error Recovery](#error-recovery)
+  - [Concurrent Safety](#concurrent-safety)
+- [Configuration](#configuration)
+  - [Configuration Example](#configuration-example)
+- [Logging](#logging)
+  - [Log Levels](#log-levels)
+- [VS Code Integration](#vs-code-integration)
+- [Performance](#performance)
+- [Development](#development)
+  - [Building from Source](#building-from-source)
+  - [Contributing](#contributing)
+  - [Architecture](#architecture)
+- [License](#license)
+- [Security](#security)
 
 ## Overview
 
@@ -292,6 +279,11 @@ Built for high performance with:
 ```bash
 # Debug build
 cargo build
+
+
+## Python workflows (venv + pip + pytest)
+
+The `python` command provides safe, repeatable workflows that avoid global installs and shell activation. It uses the venv's interpreter directly for reliability across shells and platforms.
 
 # Release build (optimized)
 cargo build --release
