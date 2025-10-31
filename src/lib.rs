@@ -2,7 +2,7 @@
 // version: 2.0.0
 // guid: d82472d1-7f0f-4eb4-b0a3-6e1547103eb4
 
-//! # Copilot Agent Utility
+//! # Safe AI Utility
 //!
 //! An extremely safe centralized command execution utility designed to solve VS Code task
 //! execution issues and provide comprehensive logging for Copilot/AI agent operations.

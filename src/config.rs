@@ -125,7 +125,7 @@ impl Config {
         }
 
         // Try to load from project config
-        let project_config = Path::new(".copilot-agent-util.toml");
+        let project_config = Path::new(".safe-ai-util.toml");
         if project_config.exists() {
             info!(
                 "Loading project configuration from: {}",
@@ -144,7 +144,7 @@ impl Config {
 
     /// Get the user configuration file path
     fn user_config_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|dir| dir.join("copilot-agent-util").join("config.toml"))
+        dirs::config_dir().map(|dir| dir.join("safe-ai-util").join("config.toml"))
     }
 
     /// Load configuration from a TOML file

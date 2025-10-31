@@ -18,20 +18,20 @@
 - [x] Clone repository locally
 - [x] Initial commit with basic structure
 
-### Objective 2: Rename copilot-agent-util-rust → safe-ai-util
+### Objective 2: Rename copilot-agent-util-rust → safe-ai-util ✅
 
-- [ ] Rename GitHub repository via gh CLI or web UI
-- [ ] Update all references in codebase:
-  - [ ] Cargo.toml package name and metadata
-  - [ ] README.md references and links
-  - [ ] CHANGELOG.md repository URLs
-  - [ ] All workflow files (.github/workflows/)
-  - [ ] Documentation files
-  - [ ] Install/distribution scripts
-- [ ] Update binary name in build outputs
-- [ ] Test that GitHub redirects work (old → new)
-- [ ] Update release artifacts naming
-- [ ] Communicate rename to users (if any)
+**Goal:** Rename the GitHub repo and update all references while maintaining zero disruption for existing users.
+
+- [x] Rename GitHub repository using `gh` or web UI
+- [x] Update `Cargo.toml` package name and repository URLs
+- [x] Update README.md with new repo name and installation instructions
+- [x] Update all workflow files (`.github/workflows/*.yml`) - No references found
+- [x] Update build scripts (`build-cross-platform.sh`, etc.)
+- [x] Search and replace all doc references (CHANGELOG historical URLs preserved for redirect)
+- [x] Verify GitHub redirect works (old URLs → new URLs)
+- [x] Update release artifacts to include both binary names (dual-binary build)
+- [x] Verify binaries installed in ~/.cargo/bin
+- [ ] Tag a new release with updated naming (next step)
 
 ### Objective 3: Implement MCP Server in safe-ai-util-mcp
 

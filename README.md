@@ -68,15 +68,15 @@ cargo install copilot-agent-util
 ### From GitHub
 
 ```bash
-git clone https://github.com/jdfalk/copilot-agent-util-rust.git
-cd copilot-agent-util-rust
+git clone https://github.com/jdfalk/safe-ai-util.git
+cd safe-ai-util
 cargo build --release
 cargo install --path .
 ```
 
 ### From Binary Releases
 
-Download pre-compiled binaries from the [releases page](https://github.com/jdfalk/copilot-agent-util-rust/releases).
+Download pre-compiled binaries from the [releases page](https://github.com/jdfalk/safe-ai-util/releases).
 Release artifacts include both names, e.g. `copilot-agent-util-macos-arm64` and `safe-ai-util-macos-arm64`.
 
 ## Usage

@@ -1,5 +1,5 @@
 // file: src/logger.rs
-// version: 1.1.0
+// version: 1.2.0
 // guid: 5a9fbb43-1e0b-4bea-a858-b74b58176503
 
 use crate::error::Result;
@@ -18,7 +18,11 @@ pub fn setup_logging() -> Result<()> {
 
     // Generate log filename with timestamp
     let now = chrono::Utc::now();
-    let log_filename = format!("{}/copilot-agent-util-{}.log", logs_dir, now.format("%Y%m%d_%H%M%S"));
+    let log_filename = format!(
+        "{}/safe-ai-util-{}.log",
+        logs_dir,
+        now.format("%Y%m%d_%H%M%S")
+    );
 
     // Create filter from environment or default to info
     let filter_stdout = EnvFilter::try_from_default_env()
@@ -53,7 +57,10 @@ pub fn setup_logging() -> Result<()> {
         .with(file_layer)
         .init();
 
-    tracing::info!("Logging initialized - writing to stdout and {}", log_filename);
+    tracing::info!(
+        "Logging initialized - writing to stdout and {}",
+        log_filename
+    );
 
     Ok(())
 }

@@ -22,10 +22,10 @@ Key ideas:
 - Works cross-platform (bin/Scripts handling) and honors --dry-run
 
 Common flows:
-- Ensure venv:           copilot-agent-util python venv ensure --path .venv
-- Install requirements:  copilot-agent-util python pip install -r requirements.txt --path .venv
-- Run pytest:            copilot-agent-util python run pytest tests/ --path .venv
-- Remove venv:           copilot-agent-util python venv remove --path .venv
+- Ensure venv:           safe-ai-util python venv ensure --path .venv
+- Install requirements:  safe-ai-util python pip install -r requirements.txt --path .venv
+- Run pytest:            safe-ai-util python run pytest tests/ --path .venv
+- Remove venv:           safe-ai-util python venv remove --path .venv
 ",
         )
         .subcommand(

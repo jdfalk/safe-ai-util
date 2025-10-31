@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     // Load configuration
     let config = Config::load().await?;
 
-    info!("Starting Copilot Agent Utility (Rust)");
+    info!("Starting Safe AI Utility");
 
     // Build CLI
     let app = build_cli();
@@ -56,7 +56,10 @@ async fn main() -> Result<()> {
                     .filter(|line| !line.trim().is_empty() && !line.trim().starts_with('#'))
                     .map(|line| line.trim().to_string())
                     .collect();
-                info!("Loaded {} additional arguments from file", additional_args.len());
+                info!(
+                    "Loaded {} additional arguments from file",
+                    additional_args.len()
+                );
             }
             Err(e) => {
                 error!("Failed to read args file {}: {}", args_file, e);
@@ -79,10 +82,10 @@ async fn main() -> Result<()> {
 }
 
 fn build_cli() -> Command {
-    Command::new("copilot-agent-util")
+    Command::new("safe-ai-util")
         .version(env!("CARGO_PKG_VERSION"))
         .author("jdfalk <jdfalk@users.noreply.github.com>")
-        .about("Extremely safe centralized utility for Copilot/AI agent command execution")
+        .about("An extremely safe and reliable command execution utility")
         .long_about("A reliable command execution utility designed to solve VS Code task execution issues and provide consistent logging for Copilot/AI agent operations. This Rust implementation emphasizes memory safety, error handling, and robust concurrent execution.")
         .arg(
             Arg::new("verbose")
@@ -123,7 +126,11 @@ fn build_cli() -> Command {
         .subcommand(uutils::build_command())
 }
 
-async fn execute_command(matches: &ArgMatches, executor: &Executor, additional_args: &[String]) -> Result<()> {
+async fn execute_command(
+    matches: &ArgMatches,
+    executor: &Executor,
+    additional_args: &[String],
+) -> Result<()> {
     // Set environment variable for additional args if present
     if !additional_args.is_empty() {
         env::set_var("COPILOT_AGENT_ADDITIONAL_ARGS", additional_args.join("\n"));
