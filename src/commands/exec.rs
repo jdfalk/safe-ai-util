@@ -146,35 +146,79 @@ impl AuditSink for SystemAuditSink {
     }
 }
 
+/// Open the audit log append-only.
+///
+/// The directory is opened with `O_DIRECTORY|O_NOFOLLOW` and checked through
+/// its file descriptor, then the file is opened relative to that descriptor
+/// with `O_NOFOLLOW`. Ancestors are deliberately not checked: on some
+/// distributions `/var/log` is group-writable (`root:syslog 0775`), and the
+/// descriptor-relative open already makes renaming an ancestor useless,
+/// because the directory actually opened must itself be root-owned and not
+/// group/other-writable.
 #[cfg(unix)]
 fn open_root_log(path: &Path) -> io::Result<std::fs::File> {
-    use crate::security::root_policy::verify_dir_chain;
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
-    let to_io = |e: crate::error::AgentError| {
-        io::Error::new(io::ErrorKind::PermissionDenied, e.to_string())
-    };
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
+
+    let denied = |msg: String| io::Error::new(io::ErrorKind::PermissionDenied, msg);
+    if !path.is_absolute() {
+        return Err(denied(format!("{} is not absolute", path.display())));
+    }
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "log path has no parent"))?;
     let name = path
         .file_name()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "log path has no file name"))?;
-    let dir = verify_dir_chain(parent, 0, None).map_err(to_io)?;
-    let f = std::fs::OpenOptions::new()
-        .append(true)
-        .create(true)
-        .mode(0o640)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(dir.join(name))?;
+    let c_dir = CString::new(parent.as_os_str().as_bytes())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in log path"))?;
+    let c_name = CString::new(name.as_bytes())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in log path"))?;
+
+    // SAFETY: c_dir is a valid NUL-terminated string; the returned fd is
+    // owned by `dir` below and closed on drop.
+    let dfd = unsafe {
+        libc::open(
+            c_dir.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if dfd < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: dfd is a freshly opened descriptor we own.
+    let dir = unsafe { std::fs::File::from_raw_fd(dfd) };
+    let dmeta = dir.metadata()?;
+    if !dmeta.is_dir() || dmeta.uid() != 0 || dmeta.mode() & 0o022 != 0 {
+        return Err(denied(format!(
+            "{} must be a root-owned directory not writable by group or other",
+            parent.display()
+        )));
+    }
+
+    // SAFETY: dir's fd is open for the duration of the call; c_name is a
+    // valid NUL-terminated string; the returned fd is owned by `f`.
+    let ffd = unsafe {
+        libc::openat(
+            dir.as_raw_fd(),
+            c_name.as_ptr(),
+            libc::O_WRONLY | libc::O_APPEND | libc::O_CREAT | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            0o640 as libc::c_uint,
+        )
+    };
+    if ffd < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: ffd is a freshly opened descriptor we own.
+    let f = unsafe { std::fs::File::from_raw_fd(ffd) };
     let meta = f.metadata()?;
     if !meta.is_file() || meta.uid() != 0 || meta.mode() & 0o022 != 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            format!(
-                "{} must be a root-owned file not writable by group or other",
-                path.display()
-            ),
-        ));
+        return Err(denied(format!(
+            "{} must be a root-owned file not writable by group or other",
+            path.display()
+        )));
     }
     Ok(f)
 }
@@ -687,5 +731,25 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             .output()
             .unwrap();
         assert_eq!(String::from_utf8_lossy(&out.stdout), "a; rm -rf / $(id)\n");
+    }
+
+    #[test]
+    fn root_log_refuses_user_owned_or_symlinked_locations() {
+        // SAFETY: no arguments, cannot fail.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let d = tempfile::tempdir().unwrap();
+        let err = open_root_log(&d.path().join("x.log")).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied, "{err}");
+        assert!(!d.path().join("x.log").exists(), "nothing created");
+
+        let link = d.path().join("logdir");
+        std::os::unix::fs::symlink("/var/log", &link).unwrap();
+        assert!(
+            open_root_log(&link.join("x.log")).is_err(),
+            "symlinked dir refused"
+        );
+        assert!(open_root_log(Path::new("relative.log")).is_err());
     }
 }
