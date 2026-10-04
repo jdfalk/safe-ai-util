@@ -37,10 +37,39 @@ pub const DEFAULT_LOG_FILE: &str = "/var/log/safe-ai-util/root-exec.log";
 pub fn forbidden_exec_basenames() -> HashSet<String> {
     let mut set = AllowlistConfig::default_blocked_commands();
     for name in [
-        "python", "python2", "python3", "node", "nodejs", "deno", "bun", "env", "xargs",
-        "busybox", "toybox", "awk", "gawk", "mawk", "nawk", "expect", "osascript", "nohup",
-        "nice", "timeout", "stdbuf", "setsid", "runuser", "chpst", "doas", "sudoedit",
-        "find", "ssh", "script", "watch", "strace", "gdb", "lldb",
+        "python",
+        "python2",
+        "python3",
+        "node",
+        "nodejs",
+        "deno",
+        "bun",
+        "env",
+        "xargs",
+        "busybox",
+        "toybox",
+        "awk",
+        "gawk",
+        "mawk",
+        "nawk",
+        "expect",
+        "osascript",
+        "nohup",
+        "nice",
+        "timeout",
+        "stdbuf",
+        "setsid",
+        "runuser",
+        "chpst",
+        "doas",
+        "sudoedit",
+        "find",
+        "ssh",
+        "script",
+        "watch",
+        "strace",
+        "gdb",
+        "lldb",
     ] {
         set.insert(name.to_string());
     }
@@ -150,8 +179,7 @@ impl RootPolicy {
                 )));
             }
             let base = bin.file_name().and_then(|b| b.to_str()).unwrap_or("");
-            if is_forbidden_basename(name, &forbidden) || is_forbidden_basename(base, &forbidden)
-            {
+            if is_forbidden_basename(name, &forbidden) || is_forbidden_basename(base, &forbidden) {
                 return Err(AgentError::config(format!(
                     "rule '{}': shells, interpreters and program launchers may not be exec targets",
                     name
@@ -336,9 +364,8 @@ mod unix_checks {
         }
         let mut cur: Option<&Path> = Some(canon.as_path());
         while let Some(p) = cur {
-            let meta = std::fs::symlink_metadata(p).map_err(|e| {
-                AgentError::security(format!("cannot stat {}: {}", p.display(), e))
-            })?;
+            let meta = std::fs::symlink_metadata(p)
+                .map_err(|e| AgentError::security(format!("cannot stat {}: {}", p.display(), e)))?;
             if !meta.is_dir() {
                 return Err(AgentError::security(format!(
                     "{} is not a directory",
@@ -458,7 +485,10 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         let root = ElevationContext::sudo_root("jdfalk");
 
         let ok = p
-            .authorize(&root, &s(&["zfs", "destroy", "bigdata/rehearsal-sandbox-data"]))
+            .authorize(
+                &root,
+                &s(&["zfs", "destroy", "bigdata/rehearsal-sandbox-data"]),
+            )
             .unwrap();
         assert_eq!(ok.binary, PathBuf::from("/usr/sbin/zfs"));
         assert_eq!(ok.args, s(&["destroy", "bigdata/rehearsal-sandbox-data"]));
@@ -466,13 +496,23 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
 
         // The binary path is accepted as the name too.
         assert!(p
-            .authorize(&root, &s(&["/usr/sbin/zfs", "destroy", "bigdata/rehearsal-sandbox-data"]))
+            .authorize(
+                &root,
+                &s(&["/usr/sbin/zfs", "destroy", "bigdata/rehearsal-sandbox-data"])
+            )
             .is_ok());
 
         let refused: &[&[&str]] = &[
             &["zfs", "destroy", "-r", "bigdata/BD/bigdata/books"],
             &["zfs", "destroy", "bigdata/rehearsal-sandbox-data; rm -rf /"],
-            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data;", "rm", "-rf", "/"],
+            &[
+                "zfs",
+                "destroy",
+                "bigdata/rehearsal-sandbox-data;",
+                "rm",
+                "-rf",
+                "/",
+            ],
             &["zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"],
             &["zfs", "destroy", "-r", "bigdata/rehearsal-sandbox-data"],
             &["zfs", "destroy", "bigdata/rehearsal-sandbox-data", "extra"],
@@ -500,7 +540,10 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         let p = RootPolicy::parse(ONE_RULE).unwrap();
         let user = ElevationContext::unprivileged(1000);
         let err = p
-            .authorize(&user, &s(&["zfs", "destroy", "bigdata/rehearsal-sandbox-data"]))
+            .authorize(
+                &user,
+                &s(&["zfs", "destroy", "bigdata/rehearsal-sandbox-data"]),
+            )
             .unwrap_err()
             .to_string();
         assert!(err.contains("requires elevation"), "{err}");
@@ -531,9 +574,7 @@ forbidden_args = ["-r"]
             ("ok", "/usr/bin/xargs"),
             ("ok", "/bin/busybox"),
         ] {
-            let text = format!(
-                "[commands.{name}]\nbinary = \"{bin}\"\nallowed_argv = [[\"x\"]]\n"
-            );
+            let text = format!("[commands.{name}]\nbinary = \"{bin}\"\nallowed_argv = [[\"x\"]]\n");
             assert!(RootPolicy::parse(&text).is_err(), "{name} {bin}");
         }
     }
@@ -559,7 +600,13 @@ forbidden_args = ["-r"]
 
     #[test]
     fn bad_child_path_rejected() {
-        for path in ["", "relative/bin", "/usr/bin:.", "/usr/bin::/bin", "/usr/../tmp"] {
+        for path in [
+            "",
+            "relative/bin",
+            "/usr/bin:.",
+            "/usr/bin::/bin",
+            "/usr/../tmp",
+        ] {
             let text = format!(
                 "path = \"{path}\"\n[commands.zfs]\nbinary = \"/usr/sbin/zfs\"\nallowed_argv = [[\"x\"]]\n"
             );
@@ -580,15 +627,20 @@ max_args = 3
         .unwrap();
         let root = ElevationContext::sudo_root("u");
         assert!(p
-            .authorize(&root, &s(&["zfs", "list", "-H", "bigdata/rehearsal-sandbox-data"]))
+            .authorize(
+                &root,
+                &s(&["zfs", "list", "-H", "bigdata/rehearsal-sandbox-data"])
+            )
             .is_ok());
         assert!(p
             .authorize(&root, &s(&["zfs", "list", "bigdata/rehearsal-x; rm -rf /"]))
             .is_err());
         assert!(p.authorize(&root, &s(&["zfs", "destroy"])).is_err());
-        assert!(p
-            .authorize(&root, &s(&["zfs", "list", "-H", "-H", "-H"]))
-            .is_err(), "max_args still applies");
+        assert!(
+            p.authorize(&root, &s(&["zfs", "list", "-H", "-H", "-H"]))
+                .is_err(),
+            "max_args still applies"
+        );
     }
 
     /// The shipped example must parse and accept exactly its eight lines.
@@ -609,15 +661,26 @@ max_args = 3
         ];
         for line in lines {
             let argv: Vec<String> = line.split(' ').map(String::from).collect();
-            let ok = p.authorize(&root, &argv).unwrap_or_else(|e| panic!("{line}: {e}"));
+            let ok = p
+                .authorize(&root, &argv)
+                .unwrap_or_else(|e| panic!("{line}: {e}"));
             assert_eq!(ok.binary.to_str().unwrap(), argv[0]);
             // Also by rule name.
             let mut by_name = argv.clone();
-            by_name[0] = Path::new(&argv[0]).file_name().unwrap().to_str().unwrap().to_string();
+            by_name[0] = Path::new(&argv[0])
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
             assert!(p.authorize(&root, &by_name).is_ok(), "{line} by name");
         }
         let total: usize = p.commands.values().map(|r| r.allowed_argv.len()).sum();
-        assert_eq!(total, lines.len(), "example allows exactly the listed commands");
+        assert_eq!(
+            total,
+            lines.len(),
+            "example allows exactly the listed commands"
+        );
         assert!(p.commands.values().all(|r| r.allowed_patterns.is_empty()));
         assert!(p.commands.values().all(|r| r.requires_elevation));
 
@@ -626,14 +689,30 @@ max_args = 3
             &["zfs", "destroy", "bigdata/BD/bigdata/books"],
             &["zfs", "destroy", "bigdata/rehearsal-sandbox-data; rm -rf /"],
             &["zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"],
-            &["zfs", "destroy", "-R", "bigdata/BD/bigdata/books@rehearsal-sandbox"],
+            &[
+                "zfs",
+                "destroy",
+                "-R",
+                "bigdata/BD/bigdata/books@rehearsal-sandbox",
+            ],
             &["chown", "-R", "0:0", "/mnt/aorg-sandbox/data"],
             &["chown", "-R", "1000:1000", "/"],
             &["chown", "-R", "1000:1000", "/mnt/aorg-sandbox/data", "/etc"],
-            &["zfs", "clone", "-o", "mountpoint=/", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
+            &[
+                "zfs",
+                "clone",
+                "-o",
+                "mountpoint=/",
+                "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
+                "bigdata/rehearsal-sandbox-data",
+            ],
         ];
         for argv in refused {
-            assert!(p.authorize(&root, &s(argv)).is_err(), "should refuse {:?}", argv);
+            assert!(
+                p.authorize(&root, &s(argv)).is_err(),
+                "should refuse {:?}",
+                argv
+            );
         }
     }
 
@@ -683,7 +762,9 @@ max_args = 3
         fn refuses_wrong_owner() {
             let d = tmp();
             let f = write_policy(d.path());
-            let err = loader(d.path(), &f, uid().wrapping_add(1)).load().unwrap_err();
+            let err = loader(d.path(), &f, uid().wrapping_add(1))
+                .load()
+                .unwrap_err();
             assert!(err.to_string().contains("owned by uid"), "{err}");
         }
 

@@ -1,5 +1,7 @@
 <!-- file: README.md -->
-<!-- version: 1.2.0 -->
+<!-- version: 1.3.0 -->
+<!-- guid: 73ce8c1c-699b-46cc-bf5c-6185e5337fd9 -->
+<!-- last-edited: 2026-10-04 -->
 # Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation
 
 > Note: We're transitioning the project name from "copilot-agent-util" to "safe-ai-util". For zero interruption, both binary names are built and supported. You can continue using `copilot-agent-util` or start using `safe-ai-util` today.
@@ -25,6 +27,7 @@
     - [Command Validation](#command-validation)
     - [Error Recovery](#error-recovery)
     - [Concurrent Safety](#concurrent-safety)
+  - [Using as a sudo gate](#using-as-a-sudo-gate)
   - [Configuration](#configuration)
     - [Configuration Example](#configuration-example)
   - [Logging](#logging)
@@ -203,6 +206,117 @@ safe-ai-util --verbose buf generate
 - Atomic file operations
 - Deadlock prevention
 - Resource cleanup guarantees
+
+## Using as a sudo gate
+
+`safe-ai-util exec` can be the only command a user may run as root through
+sudo. It runs one binary from a fixed, root-owned policy with an argv that
+must match the policy exactly.
+
+```sudoers
+jdfalk ALL=(root) NOPASSWD: /usr/local/bin/safe-ai-util exec *
+```
+
+```bash
+sudo safe-ai-util exec zfs destroy bigdata/rehearsal-sandbox-data
+sudo safe-ai-util --dry-run exec zfs destroy bigdata/rehearsal-sandbox-data  # check only
+```
+
+The policy lives at `/etc/safe-ai-util/root-policy.toml` and nowhere else.
+[`examples/aorg-sandbox-root-policy.toml`](examples/aorg-sandbox-root-policy.toml)
+is a complete example that allows exactly eight `zfs`/`chown` commands. A rule
+looks like this:
+
+```toml
+[commands.zfs]
+binary = "/usr/sbin/zfs"          # absolute; PATH is never searched
+requires_elevation = true         # refused outside the elevated exec path
+allowed_argv = [                  # exact argument vectors, element for element
+  ["destroy", "bigdata/rehearsal-sandbox-data"],
+]
+```
+
+### What happens when the process is elevated
+
+safe-ai-util counts as elevated when euid is 0, when euid differs from the
+real uid, or when `SUDO_USER`/`SUDO_UID` is set. No flag or environment
+variable can make it count as less elevated. When it is elevated:
+
+- `--config`, `--policy-overlay` and `--args-file` are refused (exit 77).
+- Every subcommand except `exec` is refused (exit 77). They read user config
+  from `$HOME` and the working directory, take log and audit paths from
+  environment variables, and several of them look tools up via PATH.
+- Logging, config discovery and the general executor are never initialised,
+  so `SAFE_AI_UTIL_LOG_DIR`, `SAFE_AI_UTIL_AUDIT_PATH`, `COPILOT_AUDIT_DIR`,
+  `./.safe-ai-util.toml` and `~/.config/safe-ai-util/config.toml` are not read.
+- The policy file and every directory above it must be owned by root and not
+  writable by group or other. The file is opened without following a final
+  symlink, and the checks run on the opened file. Otherwise exit 78.
+- The rule's binary is resolved through symlinks. The result must be a
+  root-owned executable that is not writable by group or other, in a
+  root-owned directory chain. Shells, interpreters and program launchers
+  (`sh`, `bash`, `python*`, `perl`, `env`, `xargs`, `busybox`, `find` and
+  others) are refused both when the policy loads and when the binary is
+  resolved.
+- argv goes straight to `execve`: no shell, and no splitting, quoting or
+  rewriting. `"x; rm -rf /"` is one argument, and it matches nothing.
+- The child gets an empty environment plus the policy's `path`
+  (default `/usr/sbin:/usr/bin:/sbin:/bin`), `/` as its working directory and
+  `/dev/null` as stdin.
+- Every allowed and refused `exec` is written as a JSON line to syslog
+  (authpriv) and to the policy's `log_file`
+  (default `/var/log/safe-ai-util/root-exec.log`; its directory must be
+  root-owned). If the log file cannot be written, nothing runs (exit 74).
+- Exit status: the child's own status when it runs, 77 when refused, 78 for a
+  missing or unsafe policy, 74 for an audit-log failure, 71 if the child could
+  not start.
+
+Without sudo, `exec` accepts only `--dry-run`. It reads the same fixed policy
+and prints whether the command would be allowed.
+
+### Allow rules outside the sudo gate
+
+`allowed_patterns` and the new `allowed_argv` are enforced everywhere a
+`CommandRestrictions` applies, including the `[allowlist]` section of a normal
+config file:
+
+- `allowed_argv`: the arguments must equal one listed vector exactly.
+- `allowed_patterns`: every argument must fully match at least one pattern.
+  Patterns are anchored as `^(?:pattern)$`.
+- Both empty: unprivileged runs keep the old behaviour (only the deny rules
+  apply). Elevated runs treat it as deny.
+- A rule with `requires_elevation = true` is refused on the unprivileged
+  path. It can only run through `exec` under the root policy.
+
+### Threat model
+
+**Protected against**, for a caller who can run `sudo safe-ai-util ...` with
+any arguments and any environment sudo passes through:
+
+- choosing or widening the policy (`--config`, overlays, cwd or `$HOME` config,
+  env-var overrides, a group- or world-writable policy file or directory);
+- running anything other than a listed binary with a listed argv, including
+  extra or reordered arguments, flags such as `-r`, and shell metacharacters;
+- reaching a shell or interpreter through a policy rule or a symlinked binary;
+- leaking environment (`LD_PRELOAD`, `PATH`, and so on) into the child;
+- making root create or append files at caller-chosen paths through the log
+  and audit environment variables.
+
+**Not protected against:**
+
+- **Filesystem state.** The gate pins argv, not what a path points at. In
+  `chown -R 1000:1000 /mnt/aorg-sandbox/data`, if any parent of that path is
+  writable by the caller, they can swap in a symlink or a different
+  directory and redirect the chown. Keep every directory on such a path
+  root-owned.
+- **What an allowed command does.** Each allowed argv is a capability the
+  caller holds. `zfs destroy` of a listed dataset destroys it. Only list
+  commands you are willing to have run at any time, in any order.
+- **A compromised root.** Root can edit the policy, the binary, or sudoers.
+- **sudoers itself.** A rule that allows a different binary, or `SETENV`,
+  is outside this tool's control. Use `env_reset` (the default) and never put
+  a writable path in `secure_path`.
+- **Non-unix platforms.** `exec` refuses to run there.
 
 ## Configuration
 
