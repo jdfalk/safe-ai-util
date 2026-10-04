@@ -271,6 +271,9 @@ variable can make it count as less elevated. When it is elevated:
   missing or unsafe policy, 74 for an audit-log failure, 71 if the child could
   not start.
 
+A leading `--` after `exec` is accepted and dropped. A `--` anywhere later
+counts as an argument, so it has to appear in the rule.
+
 Without sudo, `exec` accepts only `--dry-run`. It reads the same fixed policy
 and prints whether the command would be allowed.
 
@@ -309,6 +312,18 @@ any arguments and any environment sudo passes through:
   writable by the caller, they can swap in a symlink or a different
   directory and redirect the chown. Keep every directory on such a path
   root-owned.
+- **The safe-ai-util binary's own location.** `/usr/local/bin/safe-ai-util`
+  and every directory above it must be root-owned and not writable by
+  others. If the caller can replace the binary, for example because
+  `/usr/local/bin` is user-writable as in some Homebrew-style setups, the
+  sudoers line hands them a root shell. safe-ai-util cannot check this for
+  itself in time.
+- **Programs that interpret their own arguments.** The deny list covers
+  shells, interpreters and launchers by name. It does not know every
+  program that can run code from an argument: the dynamic loader
+  (`ld-linux*.so`) and `zfs program`, which runs Lua, are two examples.
+  Exact `allowed_argv` rules, as in the shipped example, make this moot.
+  Broad `allowed_patterns` rules do not.
 - **What an allowed command does.** Each allowed argv is a capability the
   caller holds. `zfs destroy` of a listed dataset destroys it. Only list
   commands you are willing to have run at any time, in any order.
@@ -317,6 +332,12 @@ any arguments and any environment sudo passes through:
   is outside this tool's control. Use `env_reset` (the default) and never put
   a writable path in `secure_path`.
 - **Non-unix platforms.** `exec` refuses to run there.
+
+**Behaviour change for root callers.** Anything that ran safe-ai-util as root
+before this change, such as a container with no `USER` line, now gets exit 77
+for every subcommand except `exec`. That is deliberate: as root, user config
+and environment-chosen paths cannot be trusted. Run those callers as an
+unprivileged user.
 
 ## Configuration
 
