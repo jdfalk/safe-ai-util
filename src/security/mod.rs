@@ -9,7 +9,8 @@
 //! for remote code execution or other malicious activities.
 
 pub mod allowlist;
-pub mod audit;
+pub mod elevation;
+pub mod root_policy;
 pub mod sanitizer;
 pub mod validator;
 
@@ -319,6 +320,7 @@ mod tests {
                 required_args: vec![],
                 forbidden_args: vec!["clean".to_string()],
                 allowed_patterns: vec![],
+                allowed_argv: vec![],
                 forbidden_patterns: vec![],
                 requires_elevation: false,
                 custom_validator: None,

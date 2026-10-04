@@ -1,5 +1,5 @@
 // file: src/security/allowlist.rs
-// version: 1.0.1
+// version: 1.1.0
 // guid: e5f6a7b8-c9d0-1234-ef56-567890123456
 // last-edited: 2026-10-04
 
@@ -26,23 +26,83 @@ pub struct AllowlistConfig {
     pub permissive_mode: bool,
 }
 
-/// Restrictions for a specific command
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Restrictions for a specific command.
+///
+/// Every field has a serde default so existing config files that predate a
+/// field keep parsing.
+///
+/// # Argument allowlisting
+///
+/// Two positive (allow) rules exist, and they are checked in addition to the
+/// negative (deny) rules:
+///
+/// * `allowed_argv` — the argument vector (everything after the command name)
+///   must be *exactly equal* to one of these lists, element for element. This
+///   is the strongest form and the only one the shipped root-policy example
+///   uses.
+/// * `allowed_patterns` — every argument must *fully* match at least one of
+///   these regexes. Patterns are anchored automatically (`^(?:p)$`), so `foo`
+///   does not admit `foo; rm -rf /`.
+///
+/// When both are empty the behaviour depends on [`EnforcementMode`]: the
+/// legacy (unprivileged) mode treats that as "no positive restriction" so
+/// existing configs keep working, while [`EnforcementMode::Elevated`] treats
+/// it as deny.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandRestrictions {
     /// Maximum number of arguments allowed
+    #[serde(default)]
     pub max_args: Option<usize>,
     /// Required arguments that must be present
+    #[serde(default)]
     pub required_args: Vec<String>,
     /// Forbidden arguments that must not be present
+    #[serde(default)]
     pub forbidden_args: Vec<String>,
-    /// Allowed argument patterns (regex)
+    /// Allowed argument patterns (regex, anchored automatically). When
+    /// non-empty, every argument must fully match at least one pattern.
+    #[serde(default)]
     pub allowed_patterns: Vec<String>,
-    /// Forbidden argument patterns (regex)
+    /// Exact argument vectors. When non-empty, the arguments must equal one
+    /// of these lists exactly (same length, same elements, same order).
+    #[serde(default)]
+    pub allowed_argv: Vec<Vec<String>>,
+    /// Forbidden argument patterns (regex, unanchored)
+    #[serde(default)]
     pub forbidden_patterns: Vec<String>,
-    /// Whether this command requires elevated privileges
+    /// When true, the command may only run in [`EnforcementMode::Elevated`],
+    /// i.e. through the `exec` subcommand under the fixed root-owned policy.
+    /// The unprivileged (legacy) validation path refuses it.
+    #[serde(default)]
     pub requires_elevation: bool,
-    /// Custom validation function name
+    /// Custom validation function name.
+    ///
+    /// No validator registry exists, so this is not dispatched anywhere. The
+    /// elevated mode therefore refuses any rule that sets it rather than
+    /// pretend a check ran.
+    #[serde(default)]
     pub custom_validator: Option<String>,
+}
+
+/// How strictly `AllowlistConfig::validate_command_with_mode` interprets a
+/// policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnforcementMode {
+    /// Unprivileged use. Empty `allowed_patterns`/`allowed_argv` mean "no
+    /// positive restriction" (pre-1.1 behaviour), `always_allowed` and
+    /// `permissive_mode` are honoured, and `requires_elevation` rules are
+    /// refused.
+    Legacy,
+    /// Running as root (euid 0) or under sudo. Fail closed: only
+    /// `conditionally_allowed` rules with a non-empty `allowed_argv` or
+    /// `allowed_patterns` can pass; `always_allowed`, `permissive_mode` and
+    /// `custom_validator` are refused because none of them constrain argv.
+    Elevated,
+}
+
+/// Anchor a user-supplied regex so it must match the whole argument.
+fn anchored(pattern: &str) -> String {
+    format!("^(?:{})$", pattern)
 }
 
 impl Default for AllowlistConfig {
@@ -70,7 +130,7 @@ impl AllowlistConfig {
     }
 
     /// Get the default set of blocked commands
-    fn default_blocked_commands() -> HashSet<String> {
+    pub fn default_blocked_commands() -> HashSet<String> {
         let mut blocked = HashSet::new();
 
         // Shell and interpreters
@@ -215,62 +275,56 @@ impl AllowlistConfig {
     /// Add commands that are conditionally allowed
     fn add_conditional_commands(&mut self) {
         // Docker with restrictions
-        self.conditionally_allowed.insert(
-            "docker".to_string(),
-            CommandRestrictions {
-                max_args: Some(20),
-                required_args: vec![],
-                forbidden_args: vec!["--privileged".to_string()],
-                allowed_patterns: vec![],
-                forbidden_patterns: vec![
-                    r"--user.*root".to_string(),
-                    r"--volume.*:/".to_string(),
-                    r"--mount.*source=/".to_string(),
-                ],
-                requires_elevation: false,
-                custom_validator: Some("validate_docker".to_string()),
-            },
-        );
+        self.conditionally_allowed.insert("docker".to_string(), CommandRestrictions {
+            max_args: Some(20),
+            required_args: vec![],
+            forbidden_args: vec!["--privileged".to_string()],
+            allowed_patterns: vec![],
+            allowed_argv: vec![],
+            forbidden_patterns: vec![
+                r"--user.*root".to_string(),
+                r"--volume.*:/".to_string(),
+                r"--mount.*source=/".to_string(),
+            ],
+            requires_elevation: false,
+            custom_validator: Some("validate_docker".to_string()),
+        });
 
         // Python with restrictions (no -c flag)
-        self.conditionally_allowed.insert(
-            "python".to_string(),
-            CommandRestrictions {
-                max_args: Some(10),
-                required_args: vec![],
-                forbidden_args: vec!["-c".to_string(), "--command".to_string()],
-                allowed_patterns: vec![],
-                forbidden_patterns: vec![r"-c\s+".to_string()],
-                requires_elevation: false,
-                custom_validator: Some("validate_python".to_string()),
-            },
-        );
+        self.conditionally_allowed.insert("python".to_string(), CommandRestrictions {
+            max_args: Some(10),
+            required_args: vec![],
+            forbidden_args: vec!["-c".to_string(), "--command".to_string()],
+            allowed_patterns: vec![],
+            allowed_argv: vec![],
+            forbidden_patterns: vec![r"-c\s+".to_string()],
+            requires_elevation: false,
+            custom_validator: Some("validate_python".to_string()),
+        });
 
         // File operations with restrictions
         for cmd in &["cp", "mv", "rm", "mkdir", "rmdir"] {
-            self.conditionally_allowed.insert(
-                cmd.to_string(),
-                CommandRestrictions {
-                    max_args: Some(100),
-                    required_args: vec![],
-                    forbidden_args: vec![],
-                    allowed_patterns: vec![],
-                    forbidden_patterns: vec![
-                        r"^/etc/".to_string(),
-                        r"^/bin/".to_string(),
-                        r"^/sbin/".to_string(),
-                        r"^/usr/bin/".to_string(),
-                        r"^/usr/sbin/".to_string(),
-                        r"^/boot/".to_string(),
-                        r"^/root/".to_string(),
-                        r"^/sys/".to_string(),
-                        r"^/proc/".to_string(),
-                        r"^/dev/".to_string(),
-                    ],
-                    requires_elevation: false,
-                    custom_validator: Some("validate_file_ops".to_string()),
-                },
-            );
+            self.conditionally_allowed.insert(cmd.to_string(), CommandRestrictions {
+                max_args: Some(100),
+                required_args: vec![],
+                forbidden_args: vec![],
+                allowed_patterns: vec![],
+                allowed_argv: vec![],
+                forbidden_patterns: vec![
+                    r"^/etc/".to_string(),
+                    r"^/bin/".to_string(),
+                    r"^/sbin/".to_string(),
+                    r"^/usr/bin/".to_string(),
+                    r"^/usr/sbin/".to_string(),
+                    r"^/boot/".to_string(),
+                    r"^/root/".to_string(),
+                    r"^/sys/".to_string(),
+                    r"^/proc/".to_string(),
+                    r"^/dev/".to_string(),
+                ],
+                requires_elevation: false,
+                custom_validator: Some("validate_file_ops".to_string()),
+            });
         }
     }
 
@@ -304,21 +358,66 @@ impl AllowlistConfig {
         false
     }
 
-    /// Validate command with arguments against restrictions
+    /// Validate command with arguments against restrictions, in the legacy
+    /// (unprivileged) enforcement mode.
     pub fn validate_command(&self, command: &str, args: &[String]) -> Result<()> {
-        if !self.is_command_allowed(command) {
+        self.validate_command_with_mode(command, args, EnforcementMode::Legacy)
+    }
+
+    /// Validate command with arguments against restrictions under the given
+    /// enforcement mode. See [`EnforcementMode`] for the differences.
+    pub fn validate_command_with_mode(
+        &self,
+        command: &str,
+        args: &[String],
+        mode: EnforcementMode,
+    ) -> Result<()> {
+        if self.blocked.contains(command) {
             return Err(AgentError::security(format!(
                 "Command '{}' is not allowed",
                 command
             )));
         }
 
-        // Apply restrictions if they exist
-        if let Some(restrictions) = self.conditionally_allowed.get(command) {
-            self.apply_restrictions(command, args, restrictions)?;
+        match mode {
+            EnforcementMode::Legacy => {
+                if !self.is_command_allowed(command) {
+                    return Err(AgentError::security(format!(
+                        "Command '{}' is not allowed",
+                        command
+                    )));
+                }
+                if let Some(restrictions) = self.conditionally_allowed.get(command) {
+                    if restrictions.requires_elevation {
+                        return Err(AgentError::security(format!(
+                            "Command '{}' requires elevation and may only run through \
+                             `exec` under the fixed root policy",
+                            command
+                        )));
+                    }
+                    self.apply_restrictions(command, args, restrictions, mode)?;
+                }
+                Ok(())
+            }
+            EnforcementMode::Elevated => {
+                let Some(restrictions) = self.conditionally_allowed.get(command) else {
+                    return Err(AgentError::security(format!(
+                        "Command '{}' has no argument-restricted rule; only \
+                         conditionally_allowed rules with allowed_argv or \
+                         allowed_patterns can run elevated",
+                        command
+                    )));
+                };
+                if restrictions.custom_validator.is_some() {
+                    return Err(AgentError::security(format!(
+                        "Command '{}' names a custom_validator, which is not \
+                         implemented; refusing to run it elevated",
+                        command
+                    )));
+                }
+                self.apply_restrictions(command, args, restrictions, mode)
+            }
         }
-
-        Ok(())
     }
 
     /// Apply restrictions to a command
@@ -327,7 +426,54 @@ impl AllowlistConfig {
         command: &str,
         args: &[String],
         restrictions: &CommandRestrictions,
+        mode: EnforcementMode,
     ) -> Result<()> {
+        // Elevated mode: a rule with no positive restriction is a deny.
+        if mode == EnforcementMode::Elevated
+            && restrictions.allowed_argv.is_empty()
+            && restrictions.allowed_patterns.is_empty()
+        {
+            return Err(AgentError::security(format!(
+                "Command '{}' has no allowed_argv or allowed_patterns; refusing \
+                 to run it elevated",
+                command
+            )));
+        }
+
+        // Exact argv templates.
+        if !restrictions.allowed_argv.is_empty()
+            && !restrictions
+                .allowed_argv
+                .iter()
+                .any(|template| template.as_slice() == args)
+        {
+            return Err(AgentError::security(format!(
+                "Command '{}' arguments {:?} do not exactly match any allowed argv",
+                command, args
+            )));
+        }
+
+        // Anchored allow patterns: every argument must fully match one.
+        if !restrictions.allowed_patterns.is_empty() {
+            let regexes = restrictions
+                .allowed_patterns
+                .iter()
+                .map(|p| {
+                    regex::Regex::new(&anchored(p)).map_err(|e| {
+                        AgentError::validation(format!("Invalid regex pattern '{}': {}", p, e))
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            for arg in args {
+                if !regexes.iter().any(|r| r.is_match(arg)) {
+                    return Err(AgentError::security(format!(
+                        "Command '{}' argument '{}' does not match any allowed pattern",
+                        command, arg
+                    )));
+                }
+            }
+        }
+
         // Check maximum arguments
         if let Some(max_args) = restrictions.max_args {
             if args.len() > max_args {
@@ -479,10 +625,15 @@ impl AllowlistConfig {
                     )));
                 }
             }
-            merged.always_allowed = overlay_allowed.clone();
-            for cmd in overlay_allowed {
-                merged.conditionally_allowed.remove(cmd);
-            }
+            // A command that is conditional in the base keeps its argument
+            // restrictions: listing it here must not promote it to
+            // always_allowed, which would drop those restrictions and widen
+            // access.
+            merged.always_allowed = overlay_allowed
+                .iter()
+                .filter(|cmd| self.always_allowed.contains(*cmd))
+                .cloned()
+                .collect();
         }
 
         // 3. blocked — union (overlay can only add bans).
@@ -506,23 +657,30 @@ impl AllowlistConfig {
                     )));
                 }
 
-                let base_restr =
-                    self.conditionally_allowed
-                        .get(cmd)
-                        .cloned()
-                        .unwrap_or_else(|| CommandRestrictions {
-                            max_args: None,
-                            required_args: vec![],
-                            forbidden_args: vec![],
-                            allowed_patterns: vec![],
-                            forbidden_patterns: vec![],
-                            requires_elevation: false,
-                            custom_validator: None,
-                        });
+                let base_restr = self
+                    .conditionally_allowed
+                    .get(cmd)
+                    .cloned()
+                    .unwrap_or_default();
 
-                let tightened = tighten_restrictions(&base_restr, overlay_restr);
-                merged.conditionally_allowed.insert(cmd.clone(), tightened);
                 merged.always_allowed.remove(cmd);
+                match tighten_restrictions(&base_restr, overlay_restr) {
+                    Some(tightened) => {
+                        merged.conditionally_allowed.insert(cmd.clone(), tightened);
+                    }
+                    None => {
+                        // Base and overlay allow-lists share nothing, so no
+                        // argument vector can satisfy both. Leaving an empty
+                        // list would read as "no positive restriction" in
+                        // legacy mode, which widens access. Block instead.
+                        warn!(
+                            "policy overlay allow-list for '{}' does not intersect the base; blocking it",
+                            cmd
+                        );
+                        merged.conditionally_allowed.remove(cmd);
+                        merged.blocked.insert(cmd.clone());
+                    }
+                }
             }
         }
 
@@ -530,15 +688,43 @@ impl AllowlistConfig {
     }
 }
 
+/// Intersect two positive allow-lists.
+///
+/// An empty list means "no positive restriction", so the populated side wins.
+/// When both are populated the result is their intersection, and `None`
+/// signals that the intersection is empty (nothing can pass both).
+fn intersect_allow<T: Clone + PartialEq>(base: &[T], overlay: &[T]) -> Option<Vec<T>> {
+    match (base.is_empty(), overlay.is_empty()) {
+        (true, _) => Some(overlay.to_vec()),
+        (_, true) => Some(base.to_vec()),
+        (false, false) => {
+            let both: Vec<T> = base
+                .iter()
+                .filter(|p| overlay.contains(p))
+                .cloned()
+                .collect();
+            if both.is_empty() {
+                None
+            } else {
+                Some(both)
+            }
+        }
+    }
+}
+
 /// Combine two `CommandRestrictions` such that the result is no looser than
 /// either operand. Forbidden lists are unioned; required lists are unioned;
-/// max_args is the minimum of the two; allowed_patterns is intersected only
-/// when both sides populate it (otherwise the populated side wins, avoiding
-/// the "empty allowed_patterns means anything goes" footgun).
+/// max_args is the minimum of the two; `allowed_patterns` and `allowed_argv`
+/// are intersected when both sides populate them (otherwise the populated
+/// side wins).
+///
+/// Returns `None` when both sides populate an allow-list and the lists share
+/// nothing: an empty result would otherwise read as "no positive
+/// restriction" and widen access, so the caller must block the command.
 fn tighten_restrictions(
     base: &CommandRestrictions,
     overlay: &CommandRestrictions,
-) -> CommandRestrictions {
+) -> Option<CommandRestrictions> {
     let mut required = base.required_args.clone();
     for r in &overlay.required_args {
         if !required.contains(r) {
@@ -560,19 +746,8 @@ fn tighten_restrictions(
         }
     }
 
-    let allowed_pat = match (
-        base.allowed_patterns.is_empty(),
-        overlay.allowed_patterns.is_empty(),
-    ) {
-        (true, _) => overlay.allowed_patterns.clone(),
-        (_, true) => base.allowed_patterns.clone(),
-        (false, false) => base
-            .allowed_patterns
-            .iter()
-            .filter(|p| overlay.allowed_patterns.contains(p))
-            .cloned()
-            .collect(),
-    };
+    let allowed_pat = intersect_allow(&base.allowed_patterns, &overlay.allowed_patterns)?;
+    let allowed_argv = intersect_allow(&base.allowed_argv, &overlay.allowed_argv)?;
 
     let max_args = match (base.max_args, overlay.max_args) {
         (Some(a), Some(b)) => Some(a.min(b)),
@@ -581,18 +756,19 @@ fn tighten_restrictions(
         (None, None) => None,
     };
 
-    CommandRestrictions {
+    Some(CommandRestrictions {
         max_args,
         required_args: required,
         forbidden_args: forbidden,
         allowed_patterns: allowed_pat,
+        allowed_argv,
         forbidden_patterns: forbidden_pat,
         requires_elevation: base.requires_elevation || overlay.requires_elevation,
         custom_validator: overlay
             .custom_validator
             .clone()
             .or_else(|| base.custom_validator.clone()),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -663,6 +839,7 @@ mod tests {
                 required_args: vec![],
                 forbidden_args: vec!["--privileged".to_string()],
                 allowed_patterns: vec![],
+                allowed_argv: vec![],
                 forbidden_patterns: vec![],
                 requires_elevation: false,
                 custom_validator: None,
@@ -743,6 +920,7 @@ mod tests {
                 required_args: vec![],
                 forbidden_args: vec!["--rm".to_string()], // adds new ban
                 allowed_patterns: vec![],
+                allowed_argv: vec![],
                 forbidden_patterns: vec![],
                 requires_elevation: false,
                 custom_validator: None,
@@ -770,6 +948,7 @@ mod tests {
                 required_args: vec![],
                 forbidden_args: vec![],
                 allowed_patterns: vec![],
+                allowed_argv: vec![],
                 forbidden_patterns: vec![],
                 requires_elevation: false,
                 custom_validator: None,
@@ -811,18 +990,16 @@ mod tests {
         let mut config = AllowlistConfig::secure_default();
 
         // Add a command with restrictions
-        config.conditionally_allowed.insert(
-            "test_cmd".to_string(),
-            CommandRestrictions {
-                max_args: Some(2),
-                required_args: vec!["--required".to_string()],
-                forbidden_args: vec!["--forbidden".to_string()],
-                allowed_patterns: vec![],
-                forbidden_patterns: vec![],
-                requires_elevation: false,
-                custom_validator: None,
-            },
-        );
+        config.conditionally_allowed.insert("test_cmd".to_string(), CommandRestrictions {
+            max_args: Some(2),
+            required_args: vec!["--required".to_string()],
+            forbidden_args: vec!["--forbidden".to_string()],
+            allowed_patterns: vec![],
+            allowed_argv: vec![],
+            forbidden_patterns: vec![],
+            requires_elevation: false,
+            custom_validator: None,
+        });
 
         // Should reject too many args
         assert!(config

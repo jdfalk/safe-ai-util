@@ -1,0 +1,45 @@
+# file: examples/aorg-sandbox-root-policy.toml
+# version: 1.0.0
+# guid: 2d8f4a61-7e3b-4c95-a0d2-5b9e1f7c3a48
+# last-edited: 2026-10-04
+#
+# Root policy for the audiobook-organizer rehearsal sandbox.
+#
+# Install as /etc/safe-ai-util/root-policy.toml, owned by root:root, mode 0644,
+# in a directory owned by root and not writable by group or other:
+#
+#   install -d -o root -g root -m 0755 /etc/safe-ai-util
+#   install -o root -g root -m 0644 aorg-sandbox-root-policy.toml \
+#       /etc/safe-ai-util/root-policy.toml
+#   install -d -o root -g root -m 0750 /var/log/safe-ai-util
+#
+# Every rule is an exact argv list: no patterns, no prefixes. Anything that is
+# not one of the eight commands below, byte for byte, is refused.
+#
+#   sudo safe-ai-util exec zfs destroy bigdata/rehearsal-sandbox-data
+
+# PATH given to the child. The rest of the environment is cleared.
+path = "/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Append-only JSON-lines audit log (also mirrored to syslog, authpriv).
+log_file = "/var/log/safe-ai-util/root-exec.log"
+
+[commands.zfs]
+binary = "/usr/sbin/zfs"
+requires_elevation = true
+allowed_argv = [
+  ["snapshot", "bigdata/BD/bigdata/books@rehearsal-sandbox", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox"],
+  ["destroy", "bigdata/BD/bigdata/books@rehearsal-sandbox"],
+  ["destroy", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox"],
+  ["destroy", "bigdata/BD/bigdata/books-sandbox"],
+  ["clone", "bigdata/BD/bigdata/books@rehearsal-sandbox", "bigdata/BD/bigdata/books-sandbox"],
+  ["destroy", "bigdata/rehearsal-sandbox-data"],
+  ["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
+]
+
+[commands.chown]
+binary = "/usr/bin/chown"
+requires_elevation = true
+allowed_argv = [
+  ["-R", "1000:1000", "/mnt/aorg-sandbox/data"],
+]
