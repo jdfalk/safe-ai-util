@@ -1,9 +1,11 @@
 // file: src/executor.rs
-// version: 2.1.1
+// version: 2.2.0
 // guid: bb371682-35cb-4f34-b318-8bf69ec125bd
 // last-edited: 2026-10-04
 
 use crate::config::Config;
+use crate::security::{SecurityManager, audit};
+use crate::security::elevation::ElevationContext;
 use crate::error::{AgentError, Result};
 use crate::security::{audit, SecurityManager};
 use std::process::Stdio;
@@ -22,7 +24,20 @@ impl Executor {
     /// When `config.allowlist` is set, the SecurityManager is built from that
     /// rich policy (per-command argument restrictions, regex patterns, max-args
     /// caps). Otherwise the legacy hardcoded allowlist is used.
+    ///
+    /// Refuses to construct when the process is elevated: the executor reads
+    /// caller-controlled config and creates its audit directory from
+    /// caller-controlled environment variables, and resolves tools via PATH.
+    /// Elevated runs go through the `exec` subcommand instead.
     pub async fn new(config: Config) -> Result<Self> {
+        let elevation = ElevationContext::detect();
+        if elevation.is_elevated() {
+            return Err(AgentError::security(format!(
+                "the general executor does not run elevated ({}); use `exec` under the fixed root policy",
+                elevation.describe()
+            )));
+        }
+
         audit::initialize_audit_system()
             .map_err(|e| AgentError::system(format!("Failed to initialize audit system: {}", e)))?;
 

@@ -1,5 +1,5 @@
 // file: src/security/mod.rs
-// version: 1.1.1
+// version: 1.2.0
 // guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 // last-edited: 2026-10-04
 
@@ -16,6 +16,7 @@ pub mod validator;
 
 use crate::error::{AgentError, Result};
 use allowlist::AllowlistConfig;
+use elevation::ElevationContext;
 use std::collections::HashSet;
 use tracing::{info, warn};
 
@@ -29,24 +30,25 @@ use tracing::{info, warn};
 ///     which provides per-command restrictions (forbidden args, regex patterns,
 ///     max-args caps, custom validators). The hashset is still populated for
 ///     `is_command_allowed` cheap-path lookups, but argument validation goes
-///     through the richer `policy.validate_command()` path.
+///     through the richer `policy.validate_command()` path, which enforces
+///     `allowed_argv`/`allowed_patterns` as well as the deny rules.
+///
+/// Neither mode runs elevated: `validate_arguments` refuses everything when
+/// the captured [`ElevationContext`] is elevated. Elevated execution goes
+/// through the `exec` subcommand and the fixed root policy only.
 #[derive(Debug, Clone)]
 pub struct SecurityManager {
     allowed_commands: HashSet<String>,
     audit_enabled: bool,
     strict_mode: bool,
     policy: Option<AllowlistConfig>,
+    elevation: ElevationContext,
 }
 
 impl SecurityManager {
     /// Create a new security manager with the default hardcoded allowlist.
     pub fn new() -> Self {
-        Self {
-            allowed_commands: Self::default_allowed_commands(),
-            audit_enabled: true,
-            strict_mode: true,
-            policy: None,
-        }
+        Self::with_context(None, ElevationContext::detect())
     }
 
     /// Create a security manager driven by a rich `AllowlistConfig`.
@@ -55,15 +57,29 @@ impl SecurityManager {
     /// `always_allowed` ∪ `conditionally_allowed.keys()` so the cheap-path
     /// check stays consistent with the rich validator.
     pub fn with_policy(policy: AllowlistConfig) -> Self {
-        let mut allowed: HashSet<String> = policy.always_allowed.iter().cloned().collect();
-        for key in policy.conditionally_allowed.keys() {
-            allowed.insert(key.clone());
-        }
+        Self::with_context(Some(policy), ElevationContext::detect())
+    }
+
+    /// Build a security manager with an explicit elevation context (tests,
+    /// or callers that already detected it).
+    pub fn with_context(policy: Option<AllowlistConfig>, elevation: ElevationContext) -> Self {
+        let allowed_commands = match &policy {
+            Some(policy) => {
+                let mut allowed: HashSet<String> =
+                    policy.always_allowed.iter().cloned().collect();
+                for key in policy.conditionally_allowed.keys() {
+                    allowed.insert(key.clone());
+                }
+                allowed
+            }
+            None => Self::default_allowed_commands(),
+        };
         Self {
-            allowed_commands: allowed,
+            allowed_commands,
             audit_enabled: true,
             strict_mode: true,
-            policy: Some(policy),
+            policy,
+            elevation,
         }
     }
 
@@ -153,6 +169,17 @@ impl SecurityManager {
     /// `AllowlistConfig::validate_command` (forbidden flags, regex patterns,
     /// max-args caps) are applied in addition to the legacy sanitizer/validator.
     pub fn validate_arguments(&self, command: &str, args: &[String]) -> Result<Vec<String>> {
+        if self.elevation.is_elevated() {
+            // No audit::log_* here: the audit directory comes from
+            // caller-controlled env vars, which must not steer root writes.
+            return Err(AgentError::security(format!(
+                "Command '{}' refused: this validation path does not run elevated ({}); \
+                 use `exec` under the fixed root policy",
+                command,
+                self.elevation.describe()
+            )));
+        }
+
         if !self.is_command_allowed(command) {
             return Err(AgentError::security(format!(
                 "Command '{}' is not allowed for security reasons",
@@ -327,7 +354,8 @@ mod tests {
             },
         );
 
-        let security = SecurityManager::with_policy(policy);
+        let security =
+            SecurityManager::with_context(Some(policy), ElevationContext::unprivileged(1000));
 
         // `make build` should pass.
         assert!(security
@@ -344,5 +372,39 @@ mod tests {
             "expected forbidden-arg rejection for 'make clean', got: {}",
             err
         );
+    }
+
+    #[test]
+    fn with_policy_enforces_allowed_argv() {
+        use crate::security::allowlist::CommandRestrictions;
+        let mut policy = AllowlistConfig::secure_default();
+        policy.always_allowed.remove("make");
+        policy.conditionally_allowed.insert(
+            "make".to_string(),
+            CommandRestrictions {
+                allowed_argv: vec![vec!["build".to_string()]],
+                ..Default::default()
+            },
+        );
+        let security =
+            SecurityManager::with_context(Some(policy), ElevationContext::unprivileged(1000));
+        assert!(security.validate_arguments("make", &["build".to_string()]).is_ok());
+        assert!(security.validate_arguments("make", &["install".to_string()]).is_err());
+        assert!(security
+            .validate_arguments("make", &["build".to_string(), "install".to_string()])
+            .is_err());
+    }
+
+    #[test]
+    fn elevated_context_refuses_every_command() {
+        for policy in [None, Some(AllowlistConfig::secure_default())] {
+            let security =
+                SecurityManager::with_context(policy, ElevationContext::sudo_root("u"));
+            let err = security
+                .validate_arguments("git", &["status".to_string()])
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("elevated"), "{err}");
+        }
     }
 }
