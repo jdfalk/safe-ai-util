@@ -1030,4 +1030,259 @@ mod tests {
             )
             .is_ok());
     }
+
+    // ---------------- Positive allow rules ----------------
+
+    fn sv(v: &[&str]) -> Vec<String> {
+        v.iter().map(|x| x.to_string()).collect()
+    }
+
+    fn single(cmd: &str, r: CommandRestrictions) -> AllowlistConfig {
+        let mut cfg = AllowlistConfig {
+            always_allowed: HashSet::new(),
+            conditionally_allowed: HashMap::new(),
+            blocked: HashSet::new(),
+            permissive_mode: false,
+        };
+        cfg.conditionally_allowed.insert(cmd.to_string(), r);
+        cfg
+    }
+
+    #[test]
+    fn allowed_patterns_are_enforced_and_anchored() {
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_patterns: vec!["list".into(), "bigdata/[a-z-]+".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg.validate_command("zfs", &sv(&["list", "bigdata/sandbox"])).is_ok());
+        // Previously accepted: allowed_patterns was never checked.
+        assert!(cfg.validate_command("zfs", &sv(&["destroy", "bigdata/sandbox"])).is_err());
+        // Anchoring: a prefix match is not enough.
+        assert!(cfg.validate_command("zfs", &sv(&["list; rm -rf /"])).is_err());
+        assert!(cfg.validate_command("zfs", &sv(&["xlist"])).is_err());
+        assert!(cfg.validate_command("zfs", &sv(&["bigdata/sandbox/../../etc"])).is_err());
+        // Alternation inside a pattern stays anchored as a whole.
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_patterns: vec!["list|get".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg.validate_command("zfs", &sv(&["get"])).is_ok());
+        assert!(cfg.validate_command("zfs", &sv(&["listx"])).is_err());
+        assert!(cfg.validate_command("zfs", &sv(&["xget"])).is_err());
+    }
+
+    #[test]
+    fn allowed_argv_is_exact() {
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["destroy", "bigdata/rehearsal-sandbox-data"])],
+                ..Default::default()
+            },
+        );
+        assert!(cfg
+            .validate_command("zfs", &sv(&["destroy", "bigdata/rehearsal-sandbox-data"]))
+            .is_ok());
+        for bad in [
+            sv(&["destroy", "-r", "bigdata/BD/bigdata/books"]),
+            sv(&["destroy", "bigdata/rehearsal-sandbox-data; rm -rf /"]),
+            sv(&["destroy", "bigdata/rehearsal-sandbox-data", "-r"]),
+            sv(&["bigdata/rehearsal-sandbox-data", "destroy"]),
+            sv(&["destroy"]),
+            sv(&[]),
+        ] {
+            assert!(cfg.validate_command("zfs", &bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn deny_rules_still_apply_with_allow_rules() {
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_patterns: vec!["[a-z-]+".into()],
+                forbidden_args: vec!["destroy".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg.validate_command("zfs", &sv(&["list"])).is_ok());
+        assert!(cfg.validate_command("zfs", &sv(&["destroy"])).is_err());
+    }
+
+    #[test]
+    fn invalid_allowed_pattern_is_an_error_not_a_pass() {
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_patterns: vec!["(".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg.validate_command("zfs", &sv(&["list"])).is_err());
+    }
+
+    #[test]
+    fn legacy_empty_allow_rules_keep_old_behaviour() {
+        let cfg = single(
+            "docker",
+            CommandRestrictions {
+                forbidden_args: vec!["--privileged".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg.validate_command("docker", &sv(&["ps", "-a"])).is_ok());
+    }
+
+    #[test]
+    fn elevated_mode_fails_closed() {
+        // Empty allow rules mean deny.
+        let cfg = single(
+            "docker",
+            CommandRestrictions {
+                forbidden_args: vec!["--privileged".into()],
+                ..Default::default()
+            },
+        );
+        assert!(cfg
+            .validate_command_with_mode("docker", &sv(&["ps"]), EnforcementMode::Elevated)
+            .is_err());
+
+        // always_allowed and permissive_mode carry no argv restriction.
+        let mut cfg = AllowlistConfig::secure_default();
+        cfg.permissive_mode = true;
+        assert!(cfg
+            .validate_command_with_mode("git", &sv(&["status"]), EnforcementMode::Elevated)
+            .is_err());
+        assert!(cfg
+            .validate_command_with_mode("unknown", &sv(&[]), EnforcementMode::Elevated)
+            .is_err());
+
+        // custom_validator is not implemented, so it cannot vouch for anything.
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["list"])],
+                custom_validator: Some("validate_zfs".into()),
+                ..Default::default()
+            },
+        );
+        assert!(cfg
+            .validate_command_with_mode("zfs", &sv(&["list"]), EnforcementMode::Elevated)
+            .is_err());
+
+        // A proper rule passes.
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["list"])],
+                requires_elevation: true,
+                ..Default::default()
+            },
+        );
+        assert!(cfg
+            .validate_command_with_mode("zfs", &sv(&["list"]), EnforcementMode::Elevated)
+            .is_ok());
+    }
+
+    #[test]
+    fn requires_elevation_refused_in_legacy_mode() {
+        let cfg = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["list"])],
+                requires_elevation: true,
+                ..Default::default()
+            },
+        );
+        let err = cfg.validate_command("zfs", &sv(&["list"])).unwrap_err();
+        assert!(err.to_string().contains("requires elevation"), "{err}");
+    }
+
+    #[test]
+    fn overlay_disjoint_allow_lists_block_the_command() {
+        let base = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_patterns: vec!["list".into()],
+                ..Default::default()
+            },
+        );
+        let mut cond = HashMap::new();
+        cond.insert(
+            "zfs".to_string(),
+            CommandRestrictions {
+                allowed_patterns: vec!["get".into()],
+                ..Default::default()
+            },
+        );
+        let overlay = AllowlistOverlay {
+            conditionally_allowed: Some(cond),
+            ..AllowlistOverlay::default()
+        };
+        let merged = base.apply_overlay(&overlay).unwrap();
+        assert!(merged.blocked.contains("zfs"));
+        assert!(merged.validate_command("zfs", &sv(&["anything"])).is_err());
+        assert!(merged.validate_command("zfs", &sv(&["list"])).is_err());
+    }
+
+    #[test]
+    fn overlay_intersects_allowed_argv() {
+        let base = single(
+            "zfs",
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["list"]), sv(&["get", "all"])],
+                ..Default::default()
+            },
+        );
+        let mut cond = HashMap::new();
+        cond.insert(
+            "zfs".to_string(),
+            CommandRestrictions {
+                allowed_argv: vec![sv(&["list"]), sv(&["destroy", "x"])],
+                ..Default::default()
+            },
+        );
+        let overlay = AllowlistOverlay {
+            conditionally_allowed: Some(cond),
+            ..AllowlistOverlay::default()
+        };
+        let merged = base.apply_overlay(&overlay).unwrap();
+        assert!(merged.validate_command("zfs", &sv(&["list"])).is_ok());
+        assert!(merged.validate_command("zfs", &sv(&["get", "all"])).is_err());
+        assert!(merged.validate_command("zfs", &sv(&["destroy", "x"])).is_err());
+    }
+
+    #[test]
+    fn overlay_always_allowed_cannot_strip_conditional_restrictions() {
+        let base = make_base();
+        let mut set = HashSet::new();
+        set.insert("docker".to_string());
+        set.insert("git".to_string());
+        let overlay = AllowlistOverlay {
+            always_allowed: Some(set),
+            ..AllowlistOverlay::default()
+        };
+        let merged = base.apply_overlay(&overlay).unwrap();
+        assert!(!merged.always_allowed.contains("docker"));
+        assert!(merged
+            .validate_command("docker", &sv(&["run", "--privileged"]))
+            .is_err());
+        assert!(merged.always_allowed.contains("git"));
+    }
+
+    #[test]
+    fn restrictions_parse_without_new_fields() {
+        // A config written before allowed_argv existed still parses.
+        let r: CommandRestrictions = toml::from_str(
+            "max_args = 3\nrequired_args = []\nforbidden_args = []\nallowed_patterns = []\nforbidden_patterns = []\nrequires_elevation = false\n",
+        )
+        .unwrap();
+        assert!(r.allowed_argv.is_empty());
+    }
 }

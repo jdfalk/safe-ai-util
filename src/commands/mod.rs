@@ -1,6 +1,7 @@
 // file: src/commands/mod.rs
-// version: 2.0.0
+// version: 2.1.0
 // guid: b3c95817-32f1-4e1c-8b34-78f6e85029dc
+// last-edited: 2026-10-04
 
 //! Command module for the Copilot Agent Utility
 //!
@@ -9,6 +10,7 @@
 pub mod awk;
 pub mod buf;
 pub mod editor;
+pub mod exec;
 pub mod file;
 pub mod git;
 pub mod linter;

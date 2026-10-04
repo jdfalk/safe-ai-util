@@ -1,9 +1,11 @@
 // file: src/config.rs
-// version: 1.1.0
+// version: 1.2.0
 // guid: 6ea31d79-e2bf-4304-a841-22bf1e595512
+// last-edited: 2026-10-04
 
 use crate::error::{AgentError, Result};
 use crate::security::allowlist::{AllowlistConfig, AllowlistOverlay};
+use crate::security::elevation::ElevationContext;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -131,10 +133,42 @@ impl Config {
     /// `--policy-overlay` paths. The overlay, when supplied, is applied to the
     /// config's allowlist (or to the default allowlist if the config has none),
     /// and the merged result must be strictly narrower than the base.
+    ///
+    /// Refuses to run at all when the process is elevated: see
+    /// [`Config::load_for_context`].
     pub async fn load_with_paths(
         explicit_config: Option<&Path>,
         overlay_path: Option<&Path>,
     ) -> Result<Self> {
+        Self::load_for_context(&ElevationContext::detect(), explicit_config, overlay_path).await
+    }
+
+    /// Like [`Config::load_with_paths`], with the elevation context supplied
+    /// by the caller.
+    ///
+    /// When `ctx` is elevated this refuses every source this loader reads:
+    /// `--config`, `--policy-overlay`, the user config under `$HOME` (sudo may
+    /// keep HOME), `./.safe-ai-util.toml` in a caller-chosen directory, and
+    /// the `COPILOT_AGENT_*` environment overrides. An elevated run's only
+    /// policy is the fixed root policy read by the `exec` subcommand.
+    pub async fn load_for_context(
+        ctx: &ElevationContext,
+        explicit_config: Option<&Path>,
+        overlay_path: Option<&Path>,
+    ) -> Result<Self> {
+        if ctx.is_elevated() {
+            let what = match (explicit_config, overlay_path) {
+                (Some(_), _) => "--config",
+                (None, Some(_)) => "--policy-overlay",
+                (None, None) => "user/project configuration and environment overrides",
+            };
+            return Err(AgentError::security(format!(
+                "{} refused when elevated ({}); only `exec` under the fixed root policy may run",
+                what,
+                ctx.describe()
+            )));
+        }
+
         let mut config = Self::default();
 
         // Discovery: --config wins over user config wins over project config.
@@ -308,5 +342,51 @@ blocked = ["bash", "curl"]
         assert!(policy.always_allowed.contains("make"));
         assert!(policy.blocked.contains("bash"));
         assert!(!policy.permissive_mode);
+    }
+
+    #[tokio::test]
+    async fn elevated_refuses_explicit_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = dir.path().join("permissive.toml");
+        std::fs::write(&cfg, "[allowlist]\npermissive_mode = true\n").unwrap();
+        let err = Config::load_for_context(&ElevationContext::sudo_root("u"), Some(&cfg), None)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--config"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn elevated_refuses_overlay() {
+        let dir = tempfile::tempdir().unwrap();
+        let ov = dir.path().join("overlay.toml");
+        std::fs::write(&ov, "permissive_mode = false\n").unwrap();
+        let err = Config::load_for_context(&ElevationContext::sudo_root("u"), None, Some(&ov))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--policy-overlay"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn elevated_refuses_default_discovery() {
+        let mut ctx = ElevationContext::unprivileged(1000);
+        ctx.euid = 0;
+        let err = Config::load_for_context(&ctx, None, None)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("refused when elevated"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn unprivileged_overlay_still_applies() {
+        let dir = tempfile::tempdir().unwrap();
+        let ov = dir.path().join("overlay.toml");
+        std::fs::write(&ov, "blocked = [\"make\"]\n").unwrap();
+        let cfg = Config::load_for_context(&ElevationContext::unprivileged(1000), None, Some(&ov))
+            .await
+            .unwrap();
+        assert!(cfg.allowlist.unwrap().blocked.contains("make"));
     }
 }

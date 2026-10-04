@@ -1,15 +1,16 @@
 // file: src/main.rs
-// version: 2.3.1
+// version: 2.4.0
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
 // last-edited: 2026-10-04
 
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use copilot_agent_util::{
-    commands::{awk, buf, editor, file, git, linter, prettier, python, sed, system, uutils},
+    commands::{awk, buf, editor, exec, file, git, linter, prettier, python, sed, system, uutils},
     config::Config,
     executor::Executor,
     logger::setup_logging,
+    security::elevation::ElevationContext,
 };
 use std::env;
 use std::fs;
@@ -31,6 +32,17 @@ fn append_additional_args(mut args: Vec<String>) -> Vec<String> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Elevation gate. Under root/sudo nothing caller-controlled may shape the
+    // policy, so branch before logging (SAFE_AI_UTIL_LOG_DIR, ./logs), config
+    // discovery (--config, ./.safe-ai-util.toml, $HOME) and the executor's
+    // audit directory (SAFE_AI_UTIL_AUDIT_PATH) are touched. Only `exec`
+    // under the fixed root policy can run from here.
+    let elevation = ElevationContext::detect();
+    if elevation.is_elevated() {
+        let matches = build_cli().get_matches();
+        std::process::exit(exec::run_elevated(&elevation, &matches));
+    }
+
     // Initialize logging first
     setup_logging()?;
 
@@ -41,9 +53,13 @@ async fn main() -> Result<()> {
     let app = build_cli();
     let matches = app.get_matches();
 
-    let explicit_config = matches
-        .get_one::<String>("config")
-        .map(std::path::PathBuf::from);
+    // `exec` never uses user config, overlays or the executor: it reads only
+    // the fixed root policy, and without sudo it only supports --dry-run.
+    if let Some(("exec", sub_matches)) = matches.subcommand() {
+        std::process::exit(exec::run_unprivileged(&elevation, &matches, sub_matches));
+    }
+
+    let explicit_config = matches.get_one::<String>("config").map(std::path::PathBuf::from);
     let overlay_path = matches
         .get_one::<String>("policy-overlay")
         .map(std::path::PathBuf::from);
@@ -139,6 +155,7 @@ fn build_cli() -> Command {
         .subcommand(awk::build_command())
         .subcommand(editor::build_command())
         .subcommand(uutils::build_command())
+        .subcommand(exec::build_command())
 }
 
 async fn execute_command(
