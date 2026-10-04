@@ -453,7 +453,12 @@ pub fn run_elevated(ctx: &ElevationContext, matches: &ArgMatches) -> i32 {
         subcommand: matches.subcommand_name(),
     };
     if let Err(err) = check_cli_request(ctx, &req) {
-        let argv: Vec<String> = std::env::args().skip(1).collect();
+        // args_os: std::env::args() panics on non-UTF-8, and with
+        // panic = "abort" the refusal would go unlogged.
+        let argv: Vec<String> = std::env::args_os()
+            .skip(1)
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
         let e = ExecLogEntry::new(ctx, &argv, "refused-gate", false);
         return refuse(
             &mut SystemAuditSink::syslog_only(),
@@ -751,5 +756,43 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             "symlinked dir refused"
         );
         assert!(open_root_log(Path::new("relative.log")).is_err());
+    }
+
+    #[test]
+    fn clap_hands_argv_through_verbatim() {
+        let m = build_command()
+            .try_get_matches_from([
+                "exec",
+                "zfs",
+                "destroy",
+                "bigdata/rehearsal-sandbox-data",
+                "-r",
+            ])
+            .unwrap();
+        assert_eq!(
+            exec_argv(&m),
+            vec!["zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"]
+        );
+
+        let m = build_command()
+            .try_get_matches_from(["exec", "zfs", "destroy", "-R", "--force", "x;y"])
+            .unwrap();
+        assert_eq!(
+            exec_argv(&m),
+            vec!["zfs", "destroy", "-R", "--force", "x;y"]
+        );
+    }
+
+    #[test]
+    fn clap_double_dash_is_consumed_as_separator() {
+        let m = build_command()
+            .try_get_matches_from(["exec", "--", "zfs", "destroy", "x"])
+            .unwrap();
+        assert_eq!(exec_argv(&m), vec!["zfs", "destroy", "x"]);
+        // A later `--` is part of argv, and so cannot match an exact rule.
+        let m = build_command()
+            .try_get_matches_from(["exec", "zfs", "--", "destroy", "x"])
+            .unwrap();
+        assert_eq!(exec_argv(&m), vec!["zfs", "--", "destroy", "x"]);
     }
 }
