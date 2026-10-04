@@ -236,7 +236,9 @@ mod tests {
     #[test]
     fn elevated_refuses_other_subcommands() {
         let ctx = ElevationContext::sudo_root("u");
-        for sub in ["git", "file", "uutils", "python", "editor", "sed", "awk", "system"] {
+        for sub in [
+            "git", "file", "uutils", "python", "editor", "sed", "awk", "system",
+        ] {
             let req = CliRequest {
                 subcommand: Some(sub),
                 ..Default::default()

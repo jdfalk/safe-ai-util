@@ -44,7 +44,13 @@ fn user_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn assert_nothing_written(dir: &std::path::Path) {
-    for name in ["logs", "evil-logs", "evil-audit", "evil-audit2", ".copilot-audit"] {
+    for name in [
+        "logs",
+        "evil-logs",
+        "evil-audit",
+        "evil-audit2",
+        ".copilot-audit",
+    ] {
         assert!(
             !dir.join(name).exists(),
             "elevated run created {} in a caller-chosen location",
@@ -56,12 +62,25 @@ fn assert_nothing_written(dir: &std::path::Path) {
 #[test]
 fn elevated_refuses_config_flag() {
     let d = tempfile::tempdir().unwrap();
-    std::fs::write(d.path().join("permissive.toml"), "[allowlist]\npermissive_mode = true\n").unwrap();
+    std::fs::write(
+        d.path().join("permissive.toml"),
+        "[allowlist]\npermissive_mode = true\n",
+    )
+    .unwrap();
     sudo_cmd(d.path())
-        .args(["--config", "permissive.toml", "exec", "zfs", "destroy", "bigdata/rehearsal-sandbox-data"])
+        .args([
+            "--config",
+            "permissive.toml",
+            "exec",
+            "zfs",
+            "destroy",
+            "bigdata/rehearsal-sandbox-data",
+        ])
         .assert()
         .code(EXIT_REFUSED)
-        .stderr(predicate::str::contains("--config is refused when elevated"));
+        .stderr(predicate::str::contains(
+            "--config is refused when elevated",
+        ));
     assert_nothing_written(d.path());
 }
 
@@ -91,7 +110,11 @@ fn elevated_refuses_args_file() {
 fn elevated_refuses_every_other_subcommand() {
     let d = tempfile::tempdir().unwrap();
     // A permissive project config in the caller's cwd must not matter.
-    std::fs::write(d.path().join(".safe-ai-util.toml"), "[allowlist]\npermissive_mode = true\n").unwrap();
+    std::fs::write(
+        d.path().join(".safe-ai-util.toml"),
+        "[allowlist]\npermissive_mode = true\n",
+    )
+    .unwrap();
     for args in [
         &["git", "status"][..],
         &["uutils", "ls"],
@@ -114,16 +137,29 @@ fn elevated_refuses_every_other_subcommand() {
 #[test]
 fn elevated_exec_never_uses_cwd_config() {
     let d = tempfile::tempdir().unwrap();
-    std::fs::write(d.path().join(".safe-ai-util.toml"), "[allowlist]\npermissive_mode = true\n").unwrap();
+    std::fs::write(
+        d.path().join(".safe-ai-util.toml"),
+        "[allowlist]\npermissive_mode = true\n",
+    )
+    .unwrap();
     // Without a valid root-owned /etc/safe-ai-util/root-policy.toml this is
     // EX_CONFIG (78); with one, an argv outside it is EX_NOPERM (77). It must
     // never succeed and must name the fixed policy path, not the cwd file.
     let out = sudo_cmd(d.path())
-        .args(["exec", "zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"])
+        .args([
+            "exec",
+            "zfs",
+            "destroy",
+            "bigdata/rehearsal-sandbox-data",
+            "-r",
+        ])
         .output()
         .unwrap();
     let code = out.status.code();
-    assert!(code == Some(77) || code == Some(78), "unexpected exit {code:?}");
+    assert!(
+        code == Some(77) || code == Some(78),
+        "unexpected exit {code:?}"
+    );
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("REFUSED"), "{err}");
     assert!(!err.contains(".safe-ai-util.toml"), "{err}");
@@ -139,12 +175,24 @@ fn exec_captures_hyphen_args_verbatim() {
     // clap must hand `-r`, `-R` and `--` through to the policy check rather
     // than rejecting them as unknown flags (clap usage errors exit 2).
     for args in [
-        &["--dry-run", "exec", "zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"][..],
+        &[
+            "--dry-run",
+            "exec",
+            "zfs",
+            "destroy",
+            "bigdata/rehearsal-sandbox-data",
+            "-r",
+        ][..],
         &["--dry-run", "exec", "zfs", "destroy", "-R", "x"],
         &["--dry-run", "exec", "--", "zfs", "destroy", "x"],
     ] {
         let out = user_cmd(d.path()).args(args).output().unwrap();
-        assert_ne!(out.status.code(), Some(2), "clap rejected {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        assert_ne!(
+            out.status.code(),
+            Some(2),
+            "clap rejected {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         assert_ne!(out.status.code(), Some(0), "{args:?} must not be allowed");
     }
 }

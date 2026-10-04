@@ -150,7 +150,9 @@ impl AuditSink for SystemAuditSink {
 fn open_root_log(path: &Path) -> io::Result<std::fs::File> {
     use crate::security::root_policy::verify_dir_chain;
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
-    let to_io = |e: crate::error::AgentError| io::Error::new(io::ErrorKind::PermissionDenied, e.to_string());
+    let to_io = |e: crate::error::AgentError| {
+        io::Error::new(io::ErrorKind::PermissionDenied, e.to_string())
+    };
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "log path has no parent"))?;
@@ -168,7 +170,10 @@ fn open_root_log(path: &Path) -> io::Result<std::fs::File> {
     if !meta.is_file() || meta.uid() != 0 || meta.mode() & 0o022 != 0 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            format!("{} must be a root-owned file not writable by group or other", path.display()),
+            format!(
+                "{} must be a root-owned file not writable by group or other",
+                path.display()
+            ),
         ));
     }
     Ok(f)
@@ -176,7 +181,10 @@ fn open_root_log(path: &Path) -> io::Result<std::fs::File> {
 
 #[cfg(not(unix))]
 fn open_root_log(_path: &Path) -> io::Result<std::fs::File> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "exec is only supported on unix"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "exec is only supported on unix",
+    ))
 }
 
 #[cfg(unix)]
@@ -311,7 +319,16 @@ pub fn run_exec(ctx: &ElevationContext, argv: &[String], dry_run: bool, env: Exe
         }
     };
 
-    let mut allowed = ExecLogEntry::new(ctx, argv, if dry_run { "dry-run-allowed" } else { "allowed" }, dry_run);
+    let mut allowed = ExecLogEntry::new(
+        ctx,
+        argv,
+        if dry_run {
+            "dry-run-allowed"
+        } else {
+            "allowed"
+        },
+        dry_run,
+    );
     allowed.rule = Some(&auth.rule);
     allowed.binary = Some(binary.display().to_string());
     if let Err(err) = sink.record(&allowed) {
@@ -338,7 +355,11 @@ pub fn run_exec(ctx: &ElevationContext, argv: &[String], dry_run: bool, env: Exe
             e.rule = Some(&auth.rule);
             e.reason = Some(format!("spawn failed: {}", err));
             let _ = sink.record(&e);
-            eprintln!("safe-ai-util: failed to start {}: {}", binary.display(), err);
+            eprintln!(
+                "safe-ai-util: failed to start {}: {}",
+                binary.display(),
+                err
+            );
             EXIT_SPAWN
         }
     }
@@ -355,7 +376,9 @@ fn system_env_run(ctx: &ElevationContext, argv: &[String], dry_run: bool) -> i32
     let loader = RootPolicyLoader::system();
     let mut early = SystemAuditSink::syslog_only();
     let open_sink = |p: &RootPolicy| -> io::Result<Box<dyn AuditSink>> {
-        Ok(Box::new(SystemAuditSink::with_root_log(Path::new(p.log_path()))?))
+        Ok(Box::new(SystemAuditSink::with_root_log(Path::new(
+            p.log_path(),
+        ))?))
     };
     let verify = |b: &Path| verify_binary(b, 0);
     run_exec(
@@ -379,14 +402,21 @@ fn system_env_run(ctx: &ElevationContext, argv: &[String], dry_run: bool) -> i32
 pub fn run_elevated(ctx: &ElevationContext, matches: &ArgMatches) -> i32 {
     let req = CliRequest {
         config: matches.get_one::<String>("config").map(String::as_str),
-        policy_overlay: matches.get_one::<String>("policy-overlay").map(String::as_str),
+        policy_overlay: matches
+            .get_one::<String>("policy-overlay")
+            .map(String::as_str),
         args_file: matches.get_one::<String>("args-file").map(String::as_str),
         subcommand: matches.subcommand_name(),
     };
     if let Err(err) = check_cli_request(ctx, &req) {
         let argv: Vec<String> = std::env::args().skip(1).collect();
         let e = ExecLogEntry::new(ctx, &argv, "refused-gate", false);
-        return refuse(&mut SystemAuditSink::syslog_only(), e, err.to_string(), EXIT_REFUSED);
+        return refuse(
+            &mut SystemAuditSink::syslog_only(),
+            e,
+            err.to_string(),
+            EXIT_REFUSED,
+        );
     }
     let Some(("exec", sub)) = matches.subcommand() else {
         // check_cli_request already guarantees `exec`.
@@ -433,19 +463,21 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     impl AuditSink for MemSink {
         fn record(&mut self, e: &ExecLogEntry<'_>) -> io::Result<()> {
             if self.fail {
-                return Err(io::Error::other("disk full"));
+                return Err(io::Error::new(io::ErrorKind::Other, "disk full"));
             }
             self.lines.borrow_mut().push(e.to_line());
             Ok(())
         }
     }
 
+    type SpawnLog = Rc<RefCell<Vec<(PathBuf, Vec<String>, String)>>>;
+
     struct Harness {
         _dir: tempfile::TempDir,
         loader: RootPolicyLoader,
         early: MemSink,
         late: MemSink,
-        spawned: Rc<RefCell<Vec<(PathBuf, Vec<String>, String)>>>,
+        spawned: SpawnLog,
     }
 
     impl Harness {
@@ -505,13 +537,23 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     fn allowed_runs_exact_argv_and_logs() {
         let mut h = Harness::new(POLICY);
         let root = ElevationContext::sudo_root("jdfalk");
-        let code = h.run(&root, &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"], false);
+        let code = h.run(
+            &root,
+            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"],
+            false,
+        );
         assert_eq!(code, 0);
         let spawned = h.spawned.borrow();
         assert_eq!(spawned.len(), 1);
         assert_eq!(spawned[0].0, PathBuf::from("/usr/sbin/zfs"));
-        assert_eq!(spawned[0].1, vec!["destroy", "bigdata/rehearsal-sandbox-data"]);
-        assert_eq!(spawned[0].2, crate::security::root_policy::DEFAULT_CHILD_PATH);
+        assert_eq!(
+            spawned[0].1,
+            vec!["destroy", "bigdata/rehearsal-sandbox-data"]
+        );
+        assert_eq!(
+            spawned[0].2,
+            crate::security::root_policy::DEFAULT_CHILD_PATH
+        );
         let lines = h.late.lines.borrow();
         assert!(lines[0].contains("\"event\":\"allowed\""), "{lines:?}");
         assert!(lines[0].contains("\"sudo_user\":\"jdfalk\""));
@@ -542,7 +584,11 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     fn unprivileged_without_dry_run_is_refused() {
         let mut h = Harness::new(POLICY);
         let user = ElevationContext::unprivileged(1000);
-        let code = h.run(&user, &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"], false);
+        let code = h.run(
+            &user,
+            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"],
+            false,
+        );
         assert_eq!(code, EXIT_REFUSED);
         assert!(h.spawned.borrow().is_empty());
         assert_eq!(h.early.lines.borrow().len(), 1);
@@ -552,7 +598,11 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     fn dry_run_never_spawns() {
         let mut h = Harness::new(POLICY);
         let root = ElevationContext::sudo_root("u");
-        let code = h.run(&root, &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"], true);
+        let code = h.run(
+            &root,
+            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"],
+            true,
+        );
         assert_eq!(code, 0);
         assert!(h.spawned.borrow().is_empty());
         assert!(h.early.lines.borrow()[0].contains("dry-run-allowed"));
@@ -563,7 +613,11 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         let mut h = Harness::new(POLICY);
         h.late.fail = true;
         let root = ElevationContext::sudo_root("u");
-        let code = h.run(&root, &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"], false);
+        let code = h.run(
+            &root,
+            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"],
+            false,
+        );
         assert_eq!(code, EXIT_AUDIT);
         assert!(h.spawned.borrow().is_empty());
     }
@@ -574,7 +628,11 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         let mut h = Harness::new(POLICY);
         std::fs::set_permissions(&h.loader.path, std::fs::Permissions::from_mode(0o666)).unwrap();
         let root = ElevationContext::sudo_root("u");
-        let code = h.run(&root, &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"], false);
+        let code = h.run(
+            &root,
+            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data"],
+            false,
+        );
         assert_eq!(code, EXIT_POLICY);
         assert!(h.spawned.borrow().is_empty());
     }
@@ -611,7 +669,9 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             args: vec![],
             child_path: "/usr/bin:/bin".into(),
         };
-        let out = child_command(Path::new("/usr/bin/env"), &auth).output().unwrap();
+        let out = child_command(Path::new("/usr/bin/env"), &auth)
+            .output()
+            .unwrap();
         let text = String::from_utf8_lossy(&out.stdout);
         assert_eq!(text.trim(), "PATH=/usr/bin:/bin", "child env: {text}");
 
@@ -623,7 +683,9 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             args: vec!["a; rm -rf / $(id)".into()],
             child_path: "/usr/bin:/bin".into(),
         };
-        let out = child_command(Path::new("/bin/echo"), &auth).output().unwrap();
+        let out = child_command(Path::new("/bin/echo"), &auth)
+            .output()
+            .unwrap();
         assert_eq!(String::from_utf8_lossy(&out.stdout), "a; rm -rf / $(id)\n");
     }
 }
