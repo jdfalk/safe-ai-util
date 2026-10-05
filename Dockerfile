@@ -1,5 +1,5 @@
 # file: Dockerfile
-# version: 1.0.1
+# version: 1.0.2
 # guid: 2b3c4d5e-6f7a-8901-bcde-f23456789012
 # last-edited: 2026-10-04
 
@@ -7,7 +7,7 @@
 FROM rust:1.98-slim as builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -45,7 +45,7 @@ RUN cargo build --release && \
 FROM debian:trixie-slim
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
     curl \

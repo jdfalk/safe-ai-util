@@ -1,5 +1,5 @@
 # file: .github/workflows/pr-automation.yml
-# version: 1.0.3
+# version: 1.0.4
 # guid: a7b8c9d0-e1f2-3456-a789-0123456789bc
 # last-edited: 2026-10-04
 
@@ -59,6 +59,9 @@ jobs:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: false
+          # changelog.d/ and todo.d/ fragments start at a ### heading by
+          # design (they are folded into CHANGELOG.md / TODO.md), so MD041
+          # cannot apply to them.
           # Super-linter v8 refuses a mix of VALIDATE_*=true and =false. With
           # only =true entries, every other linter (RUST_2015/2018 included)
           # is off.
@@ -68,4 +71,4 @@ jobs:
           VALIDATE_MARKDOWN: true
           VALIDATE_BASH: true
           VALIDATE_DOCKERFILE_HADOLINT: true
-          FILTER_REGEX_EXCLUDE: ".*\\.git/.*|.*\\.github/copilot/.*|.*\\.vscode/.*|.*node_modules/.*|.*\\.cache/.*|.*vendor/.*|.*dist/.*|.*target/.*"
+          FILTER_REGEX_EXCLUDE: ".*changelog\\.d/.*|.*todo\\.d/.*|.*\\.git/.*|.*\\.github/copilot/.*|.*\\.vscode/.*|.*node_modules/.*|.*\\.cache/.*|.*vendor/.*|.*dist/.*|.*target/.*"

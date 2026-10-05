@@ -1,0 +1,11 @@
+# file: .github/linters/.hadolint.yaml
+# version: 1.0.0
+# guid: 8e4c2a71-3b9d-4f56-a0e7-1d5b9c6f2a38
+# last-edited: 2026-10-04
+
+# DL3008 (pin apt package versions) is ignored on purpose: Debian removes
+# superseded package versions from its archive, so a pinned
+# `apt-get install pkg=1.2.3-4` stops building as soon as a security update
+# lands. The base images are pinned by tag instead.
+ignored:
+  - DL3008
