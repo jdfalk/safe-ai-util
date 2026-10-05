@@ -1,5 +1,5 @@
 <!-- file: README.md -->
-<!-- version: 1.5.0 -->
+<!-- version: 1.5.1 -->
 <!-- guid: 73ce8c1c-699b-46cc-bf5c-6185e5337fd9 -->
 <!-- last-edited: 2026-10-04 -->
 # Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation
@@ -353,8 +353,11 @@ and the top changes last.
 
 **Install requirement for the example policy:** `/mnt` and
 `/mnt/aorg-sandbox` must exist as `root:root 0755`
-(`install -d -o root -g root -m 0755 /mnt/aorg-sandbox`). Without them the
-data clone and `chown-tree` are refused.
+(`install -d -o root -g root -m 0755 /mnt/aorg-sandbox`). Without them both
+clones (media at `/mnt/aorg-sandbox/media`, data at `/mnt/aorg-sandbox/data`)
+and `chown-tree` are refused. Every clone rule sets an explicit `mountpoint=`:
+an inherited mount point can sit under a directory that a non-root user can
+write.
 
 Without sudo, `exec` accepts only `--dry-run`. It reads the same fixed policy
 and prints whether the command would be allowed.

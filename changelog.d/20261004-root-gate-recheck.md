@@ -26,3 +26,14 @@
 - **Example policy:** the data clone adds `snapdir=hidden`, `sharenfs=off`
   and `sharesmb=off`.
 - **Docs:** the README warns against sudo's `closefrom_override`.
+- **Example policy, media clone:** the media clone
+  (`bigdata/BD/bigdata/books-sandbox`) had no `-o mountpoint=`, so it mounted
+  at the inherited `/mnt/bigdata/books-sandbox`. Its parent is writable by a
+  non-root user, who could plant that path before the clone ran. The clone is
+  now its own guarded rule:
+  - an explicit `mountpoint=/mnt/aorg-sandbox/media`;
+  - `require_root_owned_ancestors`;
+  - `setuid=off`, `devices=off`, `snapdir=hidden`, `sharenfs=off` and
+    `sharesmb=off`.
+
+  **Callers must switch to the new mount point.**
