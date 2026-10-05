@@ -1,5 +1,5 @@
 // file: src/commands/exec.rs
-// version: 1.1.1
+// version: 1.2.0
 // guid: 7c1a5e93-2b8d-4f60-9e4a-3d6b0f2c8e17
 // last-edited: 2026-10-04
 
@@ -44,9 +44,10 @@ pub const EXIT_ACTION_FAILED: i32 = 1;
 /// Owners trusted for path preconditions in production: root only.
 const TRUSTED_UIDS: &[u32] = &[0];
 
-/// Signature of the built-in `chown-tree` runner: path, expected device,
-/// owner, group.
-pub type ChownTreeFn<'a> = &'a dyn Fn(&Path, u64, u32, u32) -> io::Result<ChownStats>;
+/// Signature of the built-in `chown-tree` runner: path, required dataset,
+/// owner, group. The runner re-checks ancestors, the mount and the
+/// filesystem type on the one descriptor it walks.
+pub type ChownTreeFn<'a> = &'a dyn Fn(&Path, &str, u32, u32) -> io::Result<ChownStats>;
 
 /// Build the `exec` subcommand. All remaining arguments, including ones that
 /// start with `-`, are captured verbatim as the argv to authorize.
@@ -184,24 +185,14 @@ fn open_root_log(path: &Path) -> io::Result<std::fs::File> {
     let name = path
         .file_name()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "log path has no file name"))?;
-    let c_dir = CString::new(parent.as_os_str().as_bytes())
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in log path"))?;
     let c_name = CString::new(name.as_bytes())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in log path"))?;
 
-    // SAFETY: c_dir is a valid NUL-terminated string; the returned fd is
-    // owned by `dir` below and closed on drop.
-    let dfd = unsafe {
-        libc::open(
-            c_dir.as_ptr(),
-            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
-        )
-    };
-    if dfd < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: dfd is a freshly opened descriptor we own.
-    let dir = unsafe { std::fs::File::from_raw_fd(dfd) };
+    // Resolve the directory one component at a time from `/` with
+    // O_NOFOLLOW|O_DIRECTORY (the portable equivalent of openat2's
+    // RESOLVE_NO_SYMLINKS): a symlink anywhere in the path fails, so a
+    // writable ancestor cannot redirect the log by swapping in a symlink.
+    let dir = crate::security::fs_guard::open_dir_chain(parent, None)?;
     let dmeta = dir.metadata()?;
     if !dmeta.is_dir() || dmeta.uid() != 0 || dmeta.mode() & 0o022 != 0 {
         return Err(denied(format!(
@@ -273,6 +264,19 @@ fn child_command(binary: &Path, auth: &AuthorizedExec) -> std::process::Command 
         .env("PATH", &auth.child_path)
         .current_dir("/")
         .stdin(std::process::Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // SAFETY: umask is async-signal-safe and touches no Rust state, so it
+        // is sound between fork and exec. The caller's umask (sudo passes it
+        // through) must not decide the mode of files root creates.
+        unsafe {
+            cmd.pre_exec(|| {
+                libc::umask(0o022);
+                Ok(())
+            });
+        }
+    }
     cmd
 }
 
@@ -415,20 +419,39 @@ pub fn run_exec(ctx: &ElevationContext, argv: &[String], dry_run: bool, env: Exe
     }
 
     if let ExecAction::ChownTree { path, owner, group } = &auth.action {
-        let Some(dev) = mount_dev else {
-            // Preconditions for chown-tree always include the mount check.
-            return EXIT_REFUSED;
+        let (Some(_), Some((_, dataset))) = (mount_dev, auth.preconditions.mount.as_ref()) else {
+            // Unreachable for policies that pass validation (chown_trees
+            // always carry require_mount_of), but never act silently.
+            let mut e = ExecLogEntry::new(ctx, argv, "refused-precondition", dry_run);
+            e.rule = Some(&auth.rule);
+            return refuse(
+                sink,
+                e,
+                "chown-tree has no mount requirement; refusing".into(),
+                EXIT_REFUSED,
+            );
         };
         let mut done = ExecLogEntry::new(ctx, argv, "completed", dry_run);
         done.rule = Some(&auth.rule);
         done.binary = Some(binary.display().to_string());
-        let code = match (env.chown_tree)(path, dev, *owner, *group) {
+        let code = match (env.chown_tree)(path, dataset, *owner, *group) {
             Ok(stats) => {
                 done.reason = Some(format!(
-                    "changed={} skipped_other_dev={}",
-                    stats.changed, stats.skipped_other_dev
+                    "changed={} skipped_other_dev={} failed={} too_deep={}",
+                    stats.changed, stats.skipped_other_dev, stats.failed, stats.too_deep
                 ));
-                0
+                if stats.failed > 0 || stats.too_deep > 0 {
+                    done.event = "error";
+                    eprintln!(
+                        "safe-ai-util: chown-tree {} incomplete: {} failed, {} too deep",
+                        path.display(),
+                        stats.failed,
+                        stats.too_deep
+                    );
+                    EXIT_ACTION_FAILED
+                } else {
+                    0
+                }
             }
             Err(err) => {
                 done.event = "error";
@@ -486,8 +509,9 @@ fn system_env_run(ctx: &ElevationContext, argv: &[String], dry_run: bool) -> i32
         ))?))
     };
     let verify = |b: &Path| verify_binary(b, 0);
-    let chown = |p: &Path, dev: u64, uid: u32, gid: u32| {
-        crate::security::fs_guard::chown_tree(p, dev, uid, gid, TRUSTED_UIDS)
+    let chown = |p: &Path, dataset: &str, uid: u32, gid: u32| {
+        let mountinfo = || std::fs::read_to_string("/proc/self/mountinfo");
+        crate::security::fs_guard::chown_tree(p, dataset, uid, gid, TRUSTED_UIDS, &mountinfo)
     };
     run_exec(
         ctx,
@@ -586,7 +610,7 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     }
 
     type SpawnLog = Rc<RefCell<Vec<(PathBuf, Vec<String>, String)>>>;
-    type ChownLog = Rc<RefCell<Vec<(PathBuf, u64, u32, u32)>>>;
+    type ChownLog = Rc<RefCell<Vec<(PathBuf, String, u32, u32)>>>;
 
     use crate::security::fs_guard::NodeInfo;
     use std::collections::HashMap;
@@ -643,6 +667,7 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         spawned: SpawnLog,
         chowned: ChownLog,
         fs: SandboxFs,
+        chown_result: ChownStats,
     }
 
     impl Harness {
@@ -667,6 +692,10 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
                 spawned: Rc::default(),
                 chowned: Rc::default(),
                 fs: SandboxFs::good(),
+                chown_result: ChownStats {
+                    changed: 3,
+                    ..Default::default()
+                },
             }
         }
 
@@ -686,12 +715,12 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             };
             let mut early = self.early.clone();
             let chowned = self.chowned.clone();
-            let chown = move |p: &Path, dev: u64, uid: u32, gid: u32| -> io::Result<ChownStats> {
-                chowned.borrow_mut().push((p.to_path_buf(), dev, uid, gid));
-                Ok(ChownStats {
-                    changed: 3,
-                    skipped_other_dev: 0,
-                })
+            let chown_result = self.chown_result;
+            let chown = move |p: &Path, ds: &str, uid: u32, gid: u32| -> io::Result<ChownStats> {
+                chowned
+                    .borrow_mut()
+                    .push((p.to_path_buf(), ds.to_string(), uid, gid));
+                Ok(chown_result)
             };
             run_exec(
                 ctx,
@@ -1006,7 +1035,12 @@ require_mount_of = "bigdata/rehearsal-sandbox-data"
         );
         assert_eq!(
             h.chowned.borrow().as_slice(),
-            &[(PathBuf::from("/mnt/aorg-sandbox/data"), 57, 1000, 1000)]
+            &[(
+                PathBuf::from("/mnt/aorg-sandbox/data"),
+                "bigdata/rehearsal-sandbox-data".to_string(),
+                1000,
+                1000
+            )]
         );
         assert!(h.spawned.borrow().is_empty(), "never shells out to chown");
         let lines = h.late.lines.borrow();
@@ -1083,5 +1117,39 @@ require_mount_of = "bigdata/rehearsal-sandbox-data"
             h.run(&user, &["chown-tree", "/mnt/aorg-sandbox/data"], true),
             EXIT_REFUSED
         );
+    }
+
+    #[test]
+    fn chown_tree_partial_failure_exits_non_zero() {
+        let mut h = Harness::new(GUARDED);
+        h.chown_result = ChownStats {
+            changed: 10,
+            failed: 2,
+            ..Default::default()
+        };
+        let root = ElevationContext::sudo_root("u");
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            EXIT_ACTION_FAILED
+        );
+        let lines = h.late.lines.borrow();
+        assert!(lines[1].contains("failed=2"), "{lines:?}");
+        assert!(lines[1].contains("\"event\":\"error\""), "{lines:?}");
+    }
+
+    #[test]
+    fn child_runs_with_umask_022() {
+        let auth = AuthorizedExec {
+            rule: "t".into(),
+            binary: PathBuf::from("/bin/sh"),
+            args: vec!["-c".into(), "umask".into()],
+            child_path: "/usr/bin:/bin".into(),
+            action: ExecAction::Spawn,
+            preconditions: Default::default(),
+        };
+        // The parent's umask is not changed here: it is process-wide and
+        // other tests run in parallel. This pins the child's value only.
+        let out = child_command(Path::new("/bin/sh"), &auth).output().unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "0022");
     }
 }

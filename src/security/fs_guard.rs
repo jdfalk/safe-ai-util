@@ -1,5 +1,5 @@
 // file: src/security/fs_guard.rs
-// version: 1.0.2
+// version: 1.1.0
 // guid: 3a7e1c95-6d2b-4f08-8c4e-b1f9d0a26e73
 // last-edited: 2026-10-04
 
@@ -180,30 +180,36 @@ pub fn check_root_owned_ancestors(
 pub struct MountEntry {
     pub major: u64,
     pub minor: u64,
+    /// Root of the mount within its filesystem (`/` unless a bind mount of a
+    /// subdirectory).
+    pub root: String,
     pub mount_point: String,
     pub fstype: String,
     pub source: String,
 }
 
-/// Undo mountinfo's octal escapes (`\040` for space and friends).
-fn unescape_mountinfo(s: &str) -> String {
+/// Undo mountinfo's octal escapes (`\040` for space and friends). Returns
+/// `None` for an escape above `\377`, which the kernel never writes.
+fn unescape_mountinfo(s: &str) -> Option<String> {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
         if b[i] == b'\\'
-            && i + 3 < b.len()
+            && b.len() >= i + 4
             && b[i + 1..i + 4].iter().all(|c| (b'0'..=b'7').contains(c))
         {
-            let v = (b[i + 1] - b'0') * 64 + (b[i + 2] - b'0') * 8 + (b[i + 3] - b'0');
-            out.push(v);
+            let v = u32::from(b[i + 1] - b'0') * 64
+                + u32::from(b[i + 2] - b'0') * 8
+                + u32::from(b[i + 3] - b'0');
+            out.push(u8::try_from(v).ok()?);
             i += 4;
         } else {
             out.push(b[i]);
             i += 1;
         }
     }
-    String::from_utf8_lossy(&out).into_owned()
+    Some(String::from_utf8_lossy(&out).into_owned())
 }
 
 /// Parse mountinfo text. Malformed lines are skipped (they cannot match).
@@ -224,45 +230,40 @@ pub fn parse_mountinfo(text: &str) -> Vec<MountEntry> {
         let (Ok(major), Ok(minor)) = (maj.parse(), min.parse()) else {
             continue;
         };
+        let (Some(root), Some(mount_point), Some(source)) = (
+            unescape_mountinfo(fields[3]),
+            unescape_mountinfo(fields[4]),
+            unescape_mountinfo(fields[sep + 2]),
+        ) else {
+            continue;
+        };
         out.push(MountEntry {
             major,
             minor,
-            mount_point: unescape_mountinfo(fields[4]),
+            root,
+            mount_point,
             fstype: fields[sep + 1].to_string(),
-            source: unescape_mountinfo(fields[sep + 2]),
+            source,
         });
     }
     out
 }
 
-/// Linux `major()`/`minor()` for a 64-bit `dev_t`.
+/// glibc's `gnu_dev_major`/`gnu_dev_minor` for a 64-bit `dev_t`.
 pub fn dev_major_minor(dev: u64) -> (u64, u64) {
-    let major = ((dev >> 8) & 0xfff) | ((dev >> 32) & !0xfff);
-    let minor = (dev & 0xff) | ((dev >> 12) & !0xff);
+    let major = ((dev >> 8) & 0x0000_0fff) | ((dev >> 32) & 0xffff_f000);
+    let minor = (dev & 0x0000_00ff) | ((dev >> 12) & 0xffff_ff00);
     (major, minor)
 }
 
-/// Check that `path` is currently the mount point of ZFS dataset `dataset`,
-/// and return the device id of that mount.
+/// Match a mount table against an already-opened directory's device id.
 ///
-/// The topmost mount at `path` (the last matching mountinfo line) must be
-/// `zfs` with source `dataset`, and its `major:minor` must equal the `st_dev`
-/// of `path` opened `O_NOFOLLOW|O_DIRECTORY`. A directory that merely sits
-/// where the mount should be, a different dataset mounted there, or a
-/// symlink at the path all fail.
-pub fn check_mount_of(fs: &dyn FsView, path: &Path, dataset: &str) -> io::Result<u64> {
-    let node = fs.dir_fstat(path).map_err(|e| {
-        denied(format!(
-            "{} cannot be opened as a directory: {}",
-            path.display(),
-            e
-        ))
-    })?;
-    let text = fs
-        .mountinfo()
-        .map_err(|e| denied(format!("cannot read mountinfo: {}", e)))?;
+/// The topmost mount at `path` (the last matching line) must be `zfs`, have
+/// source `dataset`, have root `/` (not a bind mount of a subdirectory of
+/// some other dataset), and its `major:minor` must equal `dev`.
+pub fn match_mount(mountinfo: &str, path: &Path, dataset: &str, dev: u64) -> io::Result<()> {
     let want = path.to_string_lossy();
-    let entry = parse_mountinfo(&text)
+    let entry = parse_mountinfo(mountinfo)
         .into_iter()
         .rev()
         .find(|m| m.mount_point == want)
@@ -276,16 +277,42 @@ pub fn check_mount_of(fs: &dyn FsView, path: &Path, dataset: &str) -> io::Result
             dataset
         )));
     }
-    if dev_major_minor(node.dev) != (entry.major, entry.minor) {
+    if entry.root != "/" {
+        return Err(denied(format!(
+            "{} is a bind mount of {} within {}, not the dataset root",
+            path.display(),
+            entry.root,
+            dataset
+        )));
+    }
+    if dev_major_minor(dev) != (entry.major, entry.minor) {
         return Err(denied(format!(
             "{} device {:?} does not match the {} mount {}:{}",
             path.display(),
-            dev_major_minor(node.dev),
+            dev_major_minor(dev),
             dataset,
             entry.major,
             entry.minor
         )));
     }
+    Ok(())
+}
+
+/// Check that `path` is currently the mount point of ZFS dataset `dataset`,
+/// and return the device id of that mount. Used for preconditions and dry
+/// runs; `chown-tree` repeats the check on the descriptor it walks.
+pub fn check_mount_of(fs: &dyn FsView, path: &Path, dataset: &str) -> io::Result<u64> {
+    let node = fs.dir_fstat(path).map_err(|e| {
+        denied(format!(
+            "{} cannot be opened as a directory: {}",
+            path.display(),
+            e
+        ))
+    })?;
+    let text = fs
+        .mountinfo()
+        .map_err(|e| denied(format!("cannot read mountinfo: {}", e)))?;
+    match_mount(&text, path, dataset, node.dev)?;
     Ok(node.dev)
 }
 
@@ -296,7 +323,18 @@ pub struct ChownStats {
     pub changed: u64,
     /// Entries skipped because they are on another filesystem (nested mounts).
     pub skipped_other_dev: u64,
+    /// Entries that could not be changed or read (the walk carries on).
+    pub failed: u64,
+    /// Directories not entered because they were deeper than [`MAX_DEPTH`].
+    pub too_deep: u64,
 }
+
+/// Deepest directory level `chown-tree` enters. One descriptor is held per
+/// level, so this also bounds descriptor use.
+pub const MAX_DEPTH: usize = 256;
+
+/// `ZFS_SUPER_MAGIC` from OpenZFS (`f_type` reported by `fstatfs`).
+pub const ZFS_SUPER_MAGIC: u64 = 0x2fc1_2fc1;
 
 #[cfg(unix)]
 mod walk {
@@ -305,7 +343,6 @@ mod walk {
     use std::fs::File;
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::io::{AsRawFd, FromRawFd};
-    use std::rc::Rc;
 
     const DIR_FLAGS: libc::c_int =
         libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
@@ -325,15 +362,20 @@ mod walk {
         Ok(unsafe { File::from_raw_fd(fd) })
     }
 
-    fn fstat(f: &File) -> io::Result<libc::stat> {
+    fn fstat_fd(fd: libc::c_int) -> io::Result<libc::stat> {
         // SAFETY: st is fully written by a successful fstat.
         let mut st: libc::stat = unsafe { std::mem::zeroed() };
-        if unsafe { libc::fstat(f.as_raw_fd(), &mut st) } != 0 {
+        if unsafe { libc::fstat(fd, &mut st) } != 0 {
             return Err(io::Error::last_os_error());
         }
         Ok(st)
     }
 
+    fn fstat(f: &File) -> io::Result<libc::stat> {
+        fstat_fd(f.as_raw_fd())
+    }
+
+    #[cfg(not(target_os = "linux"))]
     fn fstatat_nofollow(dirfd: libc::c_int, name: &CStr) -> io::Result<libc::stat> {
         // SAFETY: as above; AT_SYMLINK_NOFOLLOW stats a symlink itself.
         let mut st: libc::stat = unsafe { std::mem::zeroed() };
@@ -360,12 +402,44 @@ mod walk {
         (st_mode(st) & libc::S_IFMT as u32) == libc::S_IFDIR as u32
     }
 
-    /// Open `path` one component at a time from `/`, never following a
-    /// symlink, and check each directory opened above the target through its
-    /// descriptor (owner in `trusted_uids`, not group/other-writable). This
-    /// repeats the ancestor precondition on the descriptors actually used,
-    /// so swapping a component after the precondition ran does not help.
-    pub fn open_beneath_root(path: &Path, trusted_uids: &[u32]) -> io::Result<File> {
+    #[cfg(target_os = "linux")]
+    fn clear_errno() {
+        // SAFETY: __errno_location returns this thread's errno slot.
+        unsafe { *libc::__errno_location() = 0 }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+    fn clear_errno() {
+        // SAFETY: __error returns this thread's errno slot.
+        unsafe { *libc::__error() = 0 }
+    }
+
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd"
+    )))]
+    fn clear_errno() {}
+
+    /// Raise the soft open-file limit to the hard limit (best effort).
+    pub fn raise_nofile_limit() {
+        // SAFETY: getrlimit/setrlimit only read and write the struct.
+        unsafe {
+            let mut rl: libc::rlimit = std::mem::zeroed();
+            if libc::getrlimit(libc::RLIMIT_NOFILE, &mut rl) == 0 && rl.rlim_cur < rl.rlim_max {
+                rl.rlim_cur = rl.rlim_max;
+                let _ = libc::setrlimit(libc::RLIMIT_NOFILE, &rl);
+            }
+        }
+    }
+
+    /// Walk `path` one component at a time from `/` with
+    /// `openat(O_NOFOLLOW|O_DIRECTORY)`. A symlink in any component fails.
+    /// When `trusted_uids` is given, every directory opened above the target
+    /// is also checked through its descriptor (owner trusted, not
+    /// group/other-writable).
+    pub fn open_dir_chain(path: &Path, trusted_uids: Option<&[u32]>) -> io::Result<File> {
         if !is_clean_absolute(path) {
             return Err(denied(format!(
                 "{} is not a clean absolute path",
@@ -382,12 +456,14 @@ mod walk {
         let mut cur = unsafe { File::from_raw_fd(fd) };
         let mut shown = PathBuf::from("/");
         for comp in path.components().skip(1) {
-            let st = fstat(&cur)?;
-            if !trusted_uids.contains(&st.st_uid) || st_mode(&st) & 0o022 != 0 {
-                return Err(denied(format!(
-                    "ancestor {} is not root-owned or is writable by group or other",
-                    shown.display()
-                )));
+            if let Some(trusted) = trusted_uids {
+                let st = fstat(&cur)?;
+                if !trusted.contains(&st.st_uid) || st_mode(&st) & 0o022 != 0 {
+                    return Err(denied(format!(
+                        "ancestor {} is not root-owned or is writable by group or other",
+                        shown.display()
+                    )));
+                }
             }
             let name = cstr(comp.as_os_str().as_bytes())?;
             cur = openat_dir(cur.as_raw_fd(), &name).map_err(|e| {
@@ -400,6 +476,31 @@ mod walk {
             shown.push(comp);
         }
         Ok(cur)
+    }
+
+    /// [`open_dir_chain`] with the ancestor ownership checks.
+    pub fn open_beneath_root(path: &Path, trusted_uids: &[u32]) -> io::Result<File> {
+        open_dir_chain(path, Some(trusted_uids))
+    }
+
+    /// `f_type` of the filesystem holding `f`.
+    #[cfg(target_os = "linux")]
+    #[allow(clippy::unnecessary_cast)]
+    pub fn fs_magic(f: &File) -> io::Result<u64> {
+        // SAFETY: sfs is fully written by a successful fstatfs.
+        let mut sfs: libc::statfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::fstatfs(f.as_raw_fd(), &mut sfs) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(sfs.f_type as u64)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn fs_magic(_f: &File) -> io::Result<u64> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "filesystem magic check is Linux-only",
+        ))
     }
 
     /// List entry names of an open directory (excluding `.` and `..`).
@@ -417,150 +518,277 @@ mod walk {
         }
         unsafe { libc::rewinddir(dp) };
         let mut names = Vec::new();
-        loop {
+        let result = loop {
+            // readdir returns NULL both at the end and on error; only errno
+            // tells them apart, so clear it first.
+            clear_errno();
             // SAFETY: dp is a valid DIR*; the returned entry is valid until
             // the next readdir/closedir, and we copy the name out at once.
             let ent = unsafe { libc::readdir(dp) };
             if ent.is_null() {
-                break;
+                let e = io::Error::last_os_error();
+                break match e.raw_os_error() {
+                    Some(0) | None => Ok(()),
+                    Some(_) => Err(e),
+                };
             }
             let name = unsafe { CStr::from_ptr((*ent).d_name.as_ptr()) };
             let b = name.to_bytes();
             if b != b"." && b != b".." {
                 names.push(name.to_owned());
             }
-        }
+        };
         unsafe { libc::closedir(dp) };
-        Ok(names)
+        result.map(|()| names)
     }
 
-    /// Change every non-directory entry of `dir` (same device only) and queue
-    /// its subdirectories.
-    fn list_into(
-        dir: &Rc<File>,
+    /// Change ownership of one non-directory entry without following it.
+    ///
+    /// Linux: open it `O_PATH|O_NOFOLLOW`, `fstat` the descriptor (device
+    /// and type), then `fchownat(fd, "", AT_EMPTY_PATH)`, so the checked
+    /// inode is the changed inode. Elsewhere: `fstatat` + `fchownat` with
+    /// `AT_SYMLINK_NOFOLLOW`.
+    /// Returns `Ok(false)` when skipped (other device, became a directory,
+    /// or vanished).
+    #[cfg(target_os = "linux")]
+    fn chown_leaf(
+        dirfd: libc::c_int,
+        name: &CStr,
         dev: u64,
         uid: u32,
         gid: u32,
-        stats: &mut ChownStats,
-        pending: &mut Vec<(Rc<File>, CString)>,
-    ) -> io::Result<()> {
-        for name in read_names(dir)? {
-            let st = match fstatat_nofollow(dir.as_raw_fd(), &name) {
-                Ok(st) => st,
-                Err(e) if e.raw_os_error() == Some(libc::ENOENT) => continue,
-                Err(e) => return Err(e),
+    ) -> io::Result<Leaf> {
+        // SAFETY: name is NUL-terminated; the fd is closed by `File`.
+        let fd = unsafe {
+            libc::openat(
+                dirfd,
+                name.as_ptr(),
+                libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            let e = io::Error::last_os_error();
+            return if e.raw_os_error() == Some(libc::ENOENT) {
+                Ok(Leaf::Gone)
+            } else {
+                Err(e)
             };
-            if st_dev(&st) != dev {
-                stats.skipped_other_dev += 1;
-                continue;
-            }
-            if is_dir(&st) {
-                pending.push((Rc::clone(dir), name));
-                continue;
-            }
-            // Files, symlinks (the link itself), fifos, sockets, device
-            // nodes. AT_SYMLINK_NOFOLLOW never follows.
-            // SAFETY: dir's fd is open for the call; name is NUL-terminated.
-            let rc = unsafe {
-                libc::fchownat(
-                    dir.as_raw_fd(),
-                    name.as_ptr(),
-                    uid,
-                    gid,
-                    libc::AT_SYMLINK_NOFOLLOW,
-                )
-            };
-            if rc != 0 {
-                let e = io::Error::last_os_error();
-                if e.raw_os_error() == Some(libc::ENOENT) {
-                    continue;
-                }
-                return Err(e);
-            }
-            stats.changed += 1;
         }
-        Ok(())
+        // SAFETY: fd was just opened.
+        let f = unsafe { File::from_raw_fd(fd) };
+        let st = fstat(&f)?;
+        if st_dev(&st) != dev {
+            return Ok(Leaf::OtherDev);
+        }
+        if is_dir(&st) {
+            return Ok(Leaf::IsDir);
+        }
+        let empty = cstr(b"")?;
+        // SAFETY: f's fd is open; AT_EMPTY_PATH acts on the fd itself.
+        let rc = unsafe {
+            libc::fchownat(
+                f.as_raw_fd(),
+                empty.as_ptr(),
+                uid,
+                gid,
+                libc::AT_EMPTY_PATH | libc::AT_SYMLINK_NOFOLLOW,
+            )
+        };
+        if rc != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(Leaf::Changed)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn chown_leaf(
+        dirfd: libc::c_int,
+        name: &CStr,
+        dev: u64,
+        uid: u32,
+        gid: u32,
+    ) -> io::Result<Leaf> {
+        let st = match fstatat_nofollow(dirfd, name) {
+            Ok(st) => st,
+            Err(e) if e.raw_os_error() == Some(libc::ENOENT) => return Ok(Leaf::Gone),
+            Err(e) => return Err(e),
+        };
+        if st_dev(&st) != dev {
+            return Ok(Leaf::OtherDev);
+        }
+        if is_dir(&st) {
+            return Ok(Leaf::IsDir);
+        }
+        // SAFETY: dirfd is open; name is NUL-terminated.
+        let rc =
+            unsafe { libc::fchownat(dirfd, name.as_ptr(), uid, gid, libc::AT_SYMLINK_NOFOLLOW) };
+        if rc != 0 {
+            let e = io::Error::last_os_error();
+            return if e.raw_os_error() == Some(libc::ENOENT) {
+                Ok(Leaf::Gone)
+            } else {
+                Err(e)
+            };
+        }
+        Ok(Leaf::Changed)
+    }
+
+    enum Leaf {
+        Changed,
+        Gone,
+        OtherDev,
+        IsDir,
+    }
+
+    struct Frame {
+        dir: File,
+        names: Vec<CString>,
+        next: usize,
     }
 
     /// Set `uid:gid` on `top` and everything beneath it on the same
-    /// filesystem (`dev`), never following symlinks.
+    /// filesystem (`dev`), never following symlinks, in post-order: a
+    /// directory's contents are changed before the directory itself, and
+    /// `top` is changed last. Per-entry failures are counted and the walk
+    /// carries on.
     pub fn chown_tree_fd(top: File, dev: u64, uid: u32, gid: u32) -> io::Result<ChownStats> {
         let mut stats = ChownStats::default();
         let st = fstat(&top)?;
         if st_dev(&st) != dev || !is_dir(&st) {
             return Err(denied("top of tree is not the expected directory".into()));
         }
-        // SAFETY: fd is open; fchown on a descriptor cannot be redirected.
-        if unsafe { libc::fchown(top.as_raw_fd(), uid, gid) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        stats.changed += 1;
-
-        // Depth-first. Pending subdirectories are kept as (parent, name) and
-        // opened only when popped, so the number of open descriptors grows
-        // with depth, not with the number of directories in a wide tree.
-        let top = Rc::new(top);
-        let mut pending: Vec<(Rc<File>, CString)> = Vec::new();
-        list_into(&top, dev, uid, gid, &mut stats, &mut pending)?;
-        while let Some((parent, name)) = pending.pop() {
-            let sub = match openat_dir(parent.as_raw_fd(), &name) {
-                Ok(f) => f,
-                // Removed, or replaced by a symlink or a non-directory since
-                // it was listed (the sandbox user owns the tree). O_NOFOLLOW
-                // makes a swapped-in symlink fail here rather than be followed.
-                Err(e)
-                    if matches!(
-                        e.raw_os_error(),
-                        Some(libc::ENOENT) | Some(libc::ELOOP) | Some(libc::ENOTDIR)
-                    ) =>
-                {
-                    continue
+        let names = read_names(&top)?;
+        let mut stack = vec![Frame {
+            dir: top,
+            names,
+            next: 0,
+        }];
+        while let Some(frame) = stack.last_mut() {
+            if frame.next == frame.names.len() {
+                let done = stack.pop().expect("non-empty");
+                // SAFETY: fd is open; fchown on a descriptor cannot be
+                // redirected.
+                if unsafe { libc::fchown(done.dir.as_raw_fd(), uid, gid) } != 0 {
+                    stats.failed += 1;
+                } else {
+                    stats.changed += 1;
                 }
-                Err(e) => return Err(e),
-            };
-            drop(parent);
-            let sst = fstat(&sub)?;
-            if st_dev(&sst) != dev {
+                continue;
+            }
+            let name = frame.names[frame.next].clone();
+            frame.next += 1;
+            let at_top = stack.len() == 1;
+            // A visible .zfs control directory at the dataset root holds
+            // snapshots (automounted, other devices); never descend into it.
+            if at_top && name.as_bytes() == b".zfs" {
                 stats.skipped_other_dev += 1;
                 continue;
             }
-            // SAFETY: fd is open; fchown on a descriptor cannot be redirected.
-            if unsafe { libc::fchown(sub.as_raw_fd(), uid, gid) } != 0 {
-                return Err(io::Error::last_os_error());
+            let dirfd = stack.last().expect("non-empty").dir.as_raw_fd();
+            match chown_leaf(dirfd, &name, dev, uid, gid) {
+                Ok(Leaf::Changed) => stats.changed += 1,
+                Ok(Leaf::Gone) => {}
+                Ok(Leaf::OtherDev) => stats.skipped_other_dev += 1,
+                Err(_) => stats.failed += 1,
+                Ok(Leaf::IsDir) => {
+                    if stack.len() >= MAX_DEPTH {
+                        stats.too_deep += 1;
+                        continue;
+                    }
+                    let sub = match openat_dir(dirfd, &name) {
+                        Ok(f) => f,
+                        // Removed, or swapped for a symlink or a file since
+                        // it was checked; O_NOFOLLOW refuses to follow.
+                        Err(e)
+                            if matches!(
+                                e.raw_os_error(),
+                                Some(libc::ENOENT) | Some(libc::ELOOP) | Some(libc::ENOTDIR)
+                            ) =>
+                        {
+                            continue
+                        }
+                        Err(_) => {
+                            stats.failed += 1;
+                            continue;
+                        }
+                    };
+                    match fstat(&sub) {
+                        Ok(sst) if st_dev(&sst) == dev && is_dir(&sst) => {}
+                        Ok(_) => {
+                            stats.skipped_other_dev += 1;
+                            continue;
+                        }
+                        Err(_) => {
+                            stats.failed += 1;
+                            continue;
+                        }
+                    }
+                    match read_names(&sub) {
+                        Ok(names) => stack.push(Frame {
+                            dir: sub,
+                            names,
+                            next: 0,
+                        }),
+                        Err(_) => {
+                            // Still change the directory itself.
+                            stats.failed += 1;
+                            // SAFETY: as above.
+                            if unsafe { libc::fchown(sub.as_raw_fd(), uid, gid) } == 0 {
+                                stats.changed += 1;
+                            }
+                        }
+                    }
+                }
             }
-            stats.changed += 1;
-            let sub = Rc::new(sub);
-            list_into(&sub, dev, uid, gid, &mut stats, &mut pending)?;
         }
         Ok(stats)
     }
 }
 
 #[cfg(unix)]
-pub use walk::{chown_tree_fd, open_beneath_root};
+pub use walk::{chown_tree_fd, open_beneath_root, open_dir_chain};
 
-/// Run a whole `chown-tree`: open the target without following symlinks
-/// (re-checking ancestors on the descriptors), confirm it is still the
-/// device the mount check found, then walk it.
+/// Run a whole `chown-tree` on one descriptor:
+///
+/// 1. open `path` from `/` without following symlinks, checking every
+///    ancestor's owner and mode on the descriptors actually opened;
+/// 2. on that descriptor: `fstat` (device), `fstatfs` (ZFS magic), and the
+///    mountinfo match for `dataset` (root `/`, matching `major:minor`);
+/// 3. raise `RLIMIT_NOFILE` and walk that same descriptor.
 #[cfg(unix)]
 pub fn chown_tree(
     path: &Path,
-    expected_dev: u64,
+    dataset: &str,
     uid: u32,
     gid: u32,
     trusted_uids: &[u32],
+    mountinfo: &dyn Fn() -> io::Result<String>,
 ) -> io::Result<ChownStats> {
+    use std::os::unix::fs::MetadataExt;
     let top = open_beneath_root(path, trusted_uids)?;
-    chown_tree_fd(top, expected_dev, uid, gid)
+    let dev = top.metadata()?.dev();
+    let magic = walk::fs_magic(&top)?;
+    if magic != ZFS_SUPER_MAGIC {
+        return Err(denied(format!(
+            "{} is not on ZFS (f_type {:#x})",
+            path.display(),
+            magic
+        )));
+    }
+    let text = mountinfo().map_err(|e| denied(format!("cannot read mountinfo: {}", e)))?;
+    match_mount(&text, path, dataset, dev)?;
+    walk::raise_nofile_limit();
+    chown_tree_fd(top, dev, uid, gid)
 }
 
 #[cfg(not(unix))]
 pub fn chown_tree(
     _path: &Path,
-    _expected_dev: u64,
+    _dataset: &str,
     _uid: u32,
     _gid: u32,
     _trusted_uids: &[u32],
+    _mountinfo: &dyn Fn() -> io::Result<String>,
 ) -> io::Result<ChownStats> {
     Err(io::Error::new(io::ErrorKind::Unsupported, "unix only"))
 }
@@ -764,6 +992,34 @@ mod tests {
         assert_eq!((e[0].major, e[0].minor), (98, 0));
         assert_eq!(e[0].fstype, "ext3");
         assert_eq!(e[0].source, "/dev/root");
+    }
+
+    #[test]
+    fn bind_mount_of_a_subdirectory_is_refused() {
+        let mut fs = FakeFs::sandbox();
+        fs.mountinfo = fs.mountinfo.replace(
+            "0:57 / /mnt/aorg-sandbox/data",
+            "0:57 /some/subdir /mnt/aorg-sandbox/data",
+        );
+        let err =
+            check_mount_of(&fs, Path::new(TARGET), "bigdata/rehearsal-sandbox-data").unwrap_err();
+        assert!(err.to_string().contains("bind mount"), "{err}");
+    }
+
+    #[test]
+    fn out_of_range_octal_escape_makes_the_line_unusable() {
+        // \777 would overflow a byte; the kernel never writes it.
+        let e = parse_mountinfo("1 1 0:57 / /mnt\\777x rw - zfs pool/x rw\n");
+        assert!(e.is_empty(), "{e:?}");
+        let e = parse_mountinfo("1 1 0:57 / /mnt\\377x rw - zfs pool/x rw\n");
+        assert_eq!(e.len(), 1);
+    }
+
+    #[test]
+    fn dev_split_uses_glibc_masks() {
+        // Bits above the 32-bit major/minor ranges must not leak in.
+        let dev: u64 = 0xffff_ffff_ffff_ffff;
+        assert_eq!(dev_major_minor(dev), (0xffff_ffff, 0xffff_ffff));
     }
 
     #[test]
