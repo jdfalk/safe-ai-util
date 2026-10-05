@@ -25,3 +25,7 @@ Five separate faults kept the main branch's CI red.
   Fixing it also exposed an image bug. The runtime `WORKDIR` was owned by
   root, so every invocation, including the default `--help`, failed when the
   binary tried to create `./logs`.
+- **Code Quality Check (PR automation):** super-linter v8 refuses to start
+  when `VALIDATE_*=true` and `VALIDATE_*=false` are mixed. The two `=false`
+  entries for Rust 2015/2018 are removed. Listing only `=true` entries already
+  disables every other linter.

@@ -1,5 +1,5 @@
 # file: .github/workflows/release-docker.yml
-# version: 1.1.0
+# version: 1.1.1
 # guid: a4b5c6d7-e8f9-0a1b-2c3d-4e5f6a7b8c9d
 # last-edited: 2026-10-04
 
@@ -77,7 +77,7 @@ jobs:
           should_build = 'true'
           print(f'dockerfile-path={dockerfile_path}')
           print(f'should-build={should_build}')
-          " >> $GITHUB_OUTPUT
+          " >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
