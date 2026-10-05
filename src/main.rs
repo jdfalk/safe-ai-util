@@ -59,7 +59,9 @@ async fn main() -> Result<()> {
         std::process::exit(exec::run_unprivileged(&elevation, &matches, sub_matches));
     }
 
-    let explicit_config = matches.get_one::<String>("config").map(std::path::PathBuf::from);
+    let explicit_config = matches
+        .get_one::<String>("config")
+        .map(std::path::PathBuf::from);
     let overlay_path = matches
         .get_one::<String>("policy-overlay")
         .map(std::path::PathBuf::from);
