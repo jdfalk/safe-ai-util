@@ -29,3 +29,9 @@ Five separate faults kept the main branch's CI red.
   when `VALIDATE_*=true` and `VALIDATE_*=false` are mixed. The two `=false`
   entries for Rust 2015/2018 are removed. Listing only `=true` entries already
   disables every other linter.
+- **Code Quality Check, continued:**
+  - Hadolint: `apt-get install` now uses `--no-install-recommends`. DL3008
+    (pin apt versions) is ignored in `.github/linters/.hadolint.yaml`, with
+    the reason written there.
+  - `changelog.d/` and `todo.d/` fragments are excluded from markdown lint.
+    They start at a `###` heading by design, so MD041 cannot apply to them.
