@@ -1,5 +1,5 @@
 <!-- file: README.md -->
-<!-- version: 1.4.0 -->
+<!-- version: 1.5.0 -->
 <!-- guid: 73ce8c1c-699b-46cc-bf5c-6185e5337fd9 -->
 <!-- last-edited: 2026-10-04 -->
 # Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation
@@ -264,10 +264,12 @@ variable can make it count as less elevated. When it is elevated:
 - The child gets an empty environment plus the policy's `path`
   (default `/usr/sbin:/usr/bin:/sbin:/bin`), `/` as its working directory and
   `/dev/null` as stdin.
+- The child runs with umask `022`, whatever umask the caller had.
 - Every allowed and refused `exec` is written as a JSON line to syslog
   (authpriv) and to the policy's `log_file`
   (default `/var/log/safe-ai-util/root-exec.log`; its directory must be
-  root-owned). If the log file cannot be written, nothing runs (exit 74).
+  root-owned). Its directory is resolved without following symlinks in any
+  path component. If the log file cannot be written, nothing runs (exit 74).
 - Exit status: the child's own status when it runs, 77 when refused, 78 for a
   missing or unsafe policy, 74 for an audit-log failure, 71 if the child could
   not start.
@@ -292,8 +294,12 @@ require_root_owned_ancestors = ["/mnt/aorg-sandbox/data"]
 ```
 
 Several rules may share a binary, so one argv can carry a precondition while
-another does not. Invoke by absolute binary path; the first rule, in name
-order, whose argv matches is used.
+another does not. Every rule for that binary is consulted, whether you invoke
+it by rule name or by binary path. The preconditions of **every** rule that
+accepts the argv apply, and so does the strictest `requires_elevation`. A
+broad rule therefore cannot shadow a guarded one. Rules for the same binary
+may not list the same exact argv, and two rules that accept one argv but
+require different mounts are refused.
 
 `chown-tree` replaces `chown -R`. GNU chown and uutils chown (which some
 distributions ship as `/usr/bin/chown`) do not handle symlinks under `-R` the
@@ -313,18 +319,37 @@ checks:
 
 - every ancestor of `path` is root-owned and not group/other-writable;
 - `path` is the topmost mount at that location, is `zfs`, has source
-  `require_mount_of`, and its `major:minor` in `/proc/self/mountinfo` equals
-  the `st_dev` of `path` opened `O_NOFOLLOW|O_DIRECTORY`.
+  `require_mount_of` and mount root `/` (not a bind mount of a
+  subdirectory), and its `major:minor` in `/proc/self/mountinfo` equals the
+  `st_dev` of `path`.
 
-The walk then opens the target one component at a time from `/` with
-`openat(O_NOFOLLOW|O_DIRECTORY)`, re-checking each ancestor through its
-descriptor. It sets ownership with `fchown` on directory descriptors and
-`fchownat(AT_SYMLINK_NOFOLLOW)` on everything else, so a symlink's own
-ownership changes and its target is never touched. It skips any entry whose
-`st_dev` differs from the mount, so nested mounts are not crossed. Hard links
-cannot span filesystems, so nothing outside the dataset is reachable, whatever
-the sandbox user puts in the tree. `chown-tree` is Linux-only, because the
-mount check reads `/proc/self/mountinfo`.
+All of this happens on a single descriptor:
+
+1. The target is opened one component at a time from `/` with
+   `openat(O_NOFOLLOW|O_DIRECTORY)`, and each ancestor is checked through its
+   descriptor.
+2. That descriptor's `fstat` supplies the device, its `fstatfs` must report
+   ZFS (`0x2fc12fc1`), and the mountinfo match uses that device.
+3. The walk starts from that same descriptor.
+
+The walk is post-order: a directory's contents change before the directory,
+and the top changes last.
+
+- **Directories** are opened `O_NOFOLLOW|O_DIRECTORY` and changed with
+  `fchown` on the descriptor.
+- **Every other entry** is opened `O_PATH|O_NOFOLLOW` and checked with
+  `fstat`, then changed with `fchownat(fd, "", AT_EMPTY_PATH)`. The inode
+  checked is therefore the inode changed, and a symlink's own ownership
+  changes while its target is never touched.
+- **Skipped:** entries whose `st_dev` differs from the mount, and a
+  top-level `.zfs`. Hard links cannot span filesystems, so nothing outside
+  the dataset is reachable, whatever the sandbox user puts in the tree.
+- **Limits:** depth is capped at 256 levels (one descriptor per level), and
+  `RLIMIT_NOFILE` is raised to its hard limit first.
+- **Errors:** a per-entry error is counted and the walk continues. Any
+  failure makes the run exit 1, with the counts in the audit log.
+
+`chown-tree` is Linux-only.
 
 **Install requirement for the example policy:** `/mnt` and
 `/mnt/aorg-sandbox` must exist as `root:root 0755`
@@ -389,7 +414,10 @@ any arguments and any environment sudo passes through:
 - **A compromised root.** Root can edit the policy, the binary, or sudoers.
 - **sudoers itself.** A rule that allows a different binary, or `SETENV`,
   is outside this tool's control. Use `env_reset` (the default) and never put
-  a writable path in `secure_path`.
+  a writable path in `secure_path`. Do not set `closefrom_override`: sudo
+  then lets the caller keep open file descriptors (`sudo -C`), which root and
+  the child would inherit. safe-ai-util does not close inherited descriptors
+  itself.
 - **Non-unix platforms.** `exec` refuses to run there.
 
 **Behaviour change for root callers.** Anything that ran safe-ai-util as root

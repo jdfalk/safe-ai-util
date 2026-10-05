@@ -1,5 +1,5 @@
 # file: examples/aorg-sandbox-root-policy.toml
-# version: 1.1.0
+# version: 1.2.0
 # guid: 2d8f4a61-7e3b-4c95-a0d2-5b9e1f7c3a48
 # last-edited: 2026-10-04
 #
@@ -28,12 +28,12 @@
 #   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/BD/bigdata/books-sandbox
 #   sudo safe-ai-util exec /usr/sbin/zfs clone bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books-sandbox
 #   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/rehearsal-sandbox-data
-#   sudo safe-ai-util exec /usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data -o setuid=off -o devices=off -o exec=off bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data
+#   sudo safe-ai-util exec /usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data -o setuid=off -o devices=off -o exec=off -o snapdir=hidden -o sharenfs=off -o sharesmb=off bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data
 #   sudo safe-ai-util exec chown-tree /mnt/aorg-sandbox/data
 #
-# Invoke zfs by its absolute path: the clone into /mnt/aorg-sandbox/data is a
-# separate rule (it carries a path precondition), and the binary path matches
-# both zfs rules.
+# The clone into /mnt/aorg-sandbox/data is a separate rule because it carries
+# a path precondition. Every rule for the same binary is consulted whichever
+# name is used, and the preconditions of every accepting rule apply.
 
 # PATH given to the child. The rest of the environment is cleared.
 path = "/usr/sbin:/usr/bin:/sbin:/bin"
@@ -57,12 +57,13 @@ allowed_argv = [
 # every ancestor of the mount point is root-owned and not group/other-writable,
 # so nobody else can have planted a directory or symlink in the way. setuid,
 # device nodes and exec are off on the clone, because its contents become
-# owned by the sandbox user.
+# owned by the sandbox user. The snapshot directory is hidden and NFS/SMB
+# sharing is off so the clone is reachable only through its mount point.
 [commands.zfs-clone-sandbox-data]
 binary = "/usr/sbin/zfs"
 requires_elevation = true
 allowed_argv = [
-  ["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "-o", "setuid=off", "-o", "devices=off", "-o", "exec=off", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
+  ["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "-o", "setuid=off", "-o", "devices=off", "-o", "exec=off", "-o", "snapdir=hidden", "-o", "sharenfs=off", "-o", "sharesmb=off", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
 ]
 require_root_owned_ancestors = ["/mnt/aorg-sandbox/data"]
 
