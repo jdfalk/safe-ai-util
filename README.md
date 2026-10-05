@@ -1,5 +1,5 @@
 <!-- file: README.md -->
-<!-- version: 1.3.0 -->
+<!-- version: 1.4.0 -->
 <!-- guid: 73ce8c1c-699b-46cc-bf5c-6185e5337fd9 -->
 <!-- last-edited: 2026-10-04 -->
 # Copilot Agent Utility (renaming to "safe-ai-util") - Rust Implementation
@@ -224,7 +224,8 @@ sudo safe-ai-util --dry-run exec zfs destroy bigdata/rehearsal-sandbox-data  # c
 
 The policy lives at `/etc/safe-ai-util/root-policy.toml` and nowhere else.
 [`examples/aorg-sandbox-root-policy.toml`](examples/aorg-sandbox-root-policy.toml)
-is a complete example that allows exactly eight `zfs`/`chown` commands. A rule
+is a complete example that allows exactly seven `zfs` commands and one
+built-in `chown-tree`. A rule
 looks like this:
 
 ```toml
@@ -274,6 +275,62 @@ variable can make it count as less elevated. When it is elevated:
 A leading `--` after `exec` is accepted and dropped. A `--` anywhere later
 counts as an argument, so it has to appear in the rule.
 
+### Path preconditions and `chown-tree`
+
+argv names paths, and a path is only as safe as the directories above it.
+Two policy fields make a rule check paths immediately before it runs:
+
+```toml
+[commands.zfs-clone-sandbox-data]
+binary = "/usr/sbin/zfs"
+allowed_argv = [["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "..."]]
+# Every ancestor (/, /mnt, /mnt/aorg-sandbox) must be a real directory,
+# root-owned, not group/other-writable. The path itself may not exist yet.
+require_root_owned_ancestors = ["/mnt/aorg-sandbox/data"]
+# Optional: the path must be the mount point of this ZFS dataset.
+# require_mount = { path = "/mnt/aorg-sandbox/data", dataset = "pool/fs" }
+```
+
+Several rules may share a binary, so one argv can carry a precondition while
+another does not. Invoke by absolute binary path; the first rule, in name
+order, whose argv matches is used.
+
+`chown-tree` replaces `chown -R`. GNU chown and uutils chown (which some
+distributions ship as `/usr/bin/chown`) do not handle symlinks under `-R` the
+same way, and a gate should not depend on which one is installed.
+
+```toml
+[chown_trees.sandbox-data]
+path = "/mnt/aorg-sandbox/data"
+owner = 1000
+group = 1000
+require_mount_of = "bigdata/rehearsal-sandbox-data"   # mandatory
+```
+
+`sudo safe-ai-util exec chown-tree /mnt/aorg-sandbox/data` takes exactly one
+argument, which must equal a configured `path`. Before changing anything it
+checks:
+
+- every ancestor of `path` is root-owned and not group/other-writable;
+- `path` is the topmost mount at that location, is `zfs`, has source
+  `require_mount_of`, and its `major:minor` in `/proc/self/mountinfo` equals
+  the `st_dev` of `path` opened `O_NOFOLLOW|O_DIRECTORY`.
+
+The walk then opens the target one component at a time from `/` with
+`openat(O_NOFOLLOW|O_DIRECTORY)`, re-checking each ancestor through its
+descriptor. It sets ownership with `fchown` on directory descriptors and
+`fchownat(AT_SYMLINK_NOFOLLOW)` on everything else, so a symlink's own
+ownership changes and its target is never touched. It skips any entry whose
+`st_dev` differs from the mount, so nested mounts are not crossed. Hard links
+cannot span filesystems, so nothing outside the dataset is reachable, whatever
+the sandbox user puts in the tree. `chown-tree` is Linux-only, because the
+mount check reads `/proc/self/mountinfo`.
+
+**Install requirement for the example policy:** `/mnt` and
+`/mnt/aorg-sandbox` must exist as `root:root 0755`
+(`install -d -o root -g root -m 0755 /mnt/aorg-sandbox`). Without them the
+data clone and `chown-tree` are refused.
+
 Without sudo, `exec` accepts only `--dry-run`. It reads the same fixed policy
 and prints whether the command would be allowed.
 
@@ -307,10 +364,12 @@ any arguments and any environment sudo passes through:
 
 **Not protected against:**
 
-- **Filesystem state.** The gate pins argv, not what a path points at. In
-  `chown -R 1000:1000 /mnt/aorg-sandbox/data`, if any parent of that path is
-  writable by the caller, they can swap in a symlink or a different
-  directory and redirect the chown. Keep every directory on such a path
+- **Filesystem state outside guarded paths.** The gate pins argv, not what a
+  path points at. For paths a rule guards with
+  `require_root_owned_ancestors`, `require_mount` or `chown-tree`, the
+  ancestors are checked immediately before the action. For any other path
+  named in an argv, a caller who can write to one of its parents can swap in
+  a symlink or a directory. Guard every such path, or keep its directories
   root-owned.
 - **The safe-ai-util binary's own location.** `/usr/local/bin/safe-ai-util`
   and every directory above it must be root-owned and not writable by

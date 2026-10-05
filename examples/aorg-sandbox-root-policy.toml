@@ -1,5 +1,5 @@
 # file: examples/aorg-sandbox-root-policy.toml
-# version: 1.0.0
+# version: 1.1.0
 # guid: 2d8f4a61-7e3b-4c95-a0d2-5b9e1f7c3a48
 # last-edited: 2026-10-04
 #
@@ -13,10 +13,27 @@
 #       /etc/safe-ai-util/root-policy.toml
 #   install -d -o root -g root -m 0750 /var/log/safe-ai-util
 #
-# Every rule is an exact argv list: no patterns, no prefixes. Anything that is
-# not one of the eight commands below, byte for byte, is refused.
+# INSTALL REQUIREMENT: the sandbox mount point's parent must exist, owned by
+# root:root and mode 0755, and /mnt must be the same. The clone and
+# chown-tree rules refuse to run otherwise:
 #
-#   sudo safe-ai-util exec zfs destroy bigdata/rehearsal-sandbox-data
+#   install -d -o root -g root -m 0755 /mnt/aorg-sandbox
+#
+# Every rule is exact: no patterns, no prefixes. Anything that is not one of
+# the eight invocations below, byte for byte, is refused:
+#
+#   sudo safe-ai-util exec /usr/sbin/zfs snapshot bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox
+#   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/BD/bigdata/books@rehearsal-sandbox
+#   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox
+#   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/BD/bigdata/books-sandbox
+#   sudo safe-ai-util exec /usr/sbin/zfs clone bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books-sandbox
+#   sudo safe-ai-util exec /usr/sbin/zfs destroy bigdata/rehearsal-sandbox-data
+#   sudo safe-ai-util exec /usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data -o setuid=off -o devices=off -o exec=off bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data
+#   sudo safe-ai-util exec chown-tree /mnt/aorg-sandbox/data
+#
+# Invoke zfs by its absolute path: the clone into /mnt/aorg-sandbox/data is a
+# separate rule (it carries a path precondition), and the binary path matches
+# both zfs rules.
 
 # PATH given to the child. The rest of the environment is cleared.
 path = "/usr/sbin:/usr/bin:/sbin:/bin"
@@ -34,12 +51,29 @@ allowed_argv = [
   ["destroy", "bigdata/BD/bigdata/books-sandbox"],
   ["clone", "bigdata/BD/bigdata/books@rehearsal-sandbox", "bigdata/BD/bigdata/books-sandbox"],
   ["destroy", "bigdata/rehearsal-sandbox-data"],
-  ["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
 ]
 
-[commands.chown]
-binary = "/usr/bin/chown"
+# The clone that creates a mount under /mnt/aorg-sandbox. It runs only if
+# every ancestor of the mount point is root-owned and not group/other-writable,
+# so nobody else can have planted a directory or symlink in the way. setuid,
+# device nodes and exec are off on the clone, because its contents become
+# owned by the sandbox user.
+[commands.zfs-clone-sandbox-data]
+binary = "/usr/sbin/zfs"
 requires_elevation = true
 allowed_argv = [
-  ["-R", "1000:1000", "/mnt/aorg-sandbox/data"],
+  ["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "-o", "setuid=off", "-o", "devices=off", "-o", "exec=off", "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox", "bigdata/rehearsal-sandbox-data"],
 ]
+require_root_owned_ancestors = ["/mnt/aorg-sandbox/data"]
+
+# Built-in replacement for `chown -R 1000:1000 /mnt/aorg-sandbox/data`.
+# No chown binary is run. safe-ai-util walks the tree itself with
+# openat(O_NOFOLLOW|O_DIRECTORY) and fchownat(AT_SYMLINK_NOFOLLOW), never
+# follows a symlink and never leaves the dataset's filesystem. It runs only if
+# the path's ancestors are root-owned and the path is the mount point of
+# bigdata/rehearsal-sandbox-data, checked against /proc/self/mountinfo.
+[chown_trees.sandbox-data]
+path = "/mnt/aorg-sandbox/data"
+owner = 1000
+group = 1000
+require_mount_of = "bigdata/rehearsal-sandbox-data"
