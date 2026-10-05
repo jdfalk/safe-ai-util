@@ -1,5 +1,5 @@
 // file: src/security/fs_guard.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: 3a7e1c95-6d2b-4f08-8c4e-b1f9d0a26e73
 // last-edited: 2026-10-04
 
@@ -343,8 +343,21 @@ mod walk {
         Ok(st)
     }
 
+    // The casts below are identities on Linux but not elsewhere: mode_t is
+    // u16 and dev_t is i32 on macOS. Keep them in one place.
+    #[allow(clippy::unnecessary_cast)]
+    fn st_mode(st: &libc::stat) -> u32 {
+        st.st_mode as u32
+    }
+
+    #[allow(clippy::unnecessary_cast)]
+    fn st_dev(st: &libc::stat) -> u64 {
+        st.st_dev as u64
+    }
+
+    #[allow(clippy::unnecessary_cast)]
     fn is_dir(st: &libc::stat) -> bool {
-        (st.st_mode as u32 & libc::S_IFMT as u32) == libc::S_IFDIR as u32
+        (st_mode(st) & libc::S_IFMT as u32) == libc::S_IFDIR as u32
     }
 
     /// Open `path` one component at a time from `/`, never following a
@@ -370,7 +383,7 @@ mod walk {
         let mut shown = PathBuf::from("/");
         for comp in path.components().skip(1) {
             let st = fstat(&cur)?;
-            if !trusted_uids.contains(&st.st_uid) || (st.st_mode as u32) & 0o022 != 0 {
+            if !trusted_uids.contains(&st.st_uid) || st_mode(&st) & 0o022 != 0 {
                 return Err(denied(format!(
                     "ancestor {} is not root-owned or is writable by group or other",
                     shown.display()
@@ -437,7 +450,7 @@ mod walk {
                 Err(e) if e.raw_os_error() == Some(libc::ENOENT) => continue,
                 Err(e) => return Err(e),
             };
-            if st.st_dev as u64 != dev {
+            if st_dev(&st) != dev {
                 stats.skipped_other_dev += 1;
                 continue;
             }
@@ -474,7 +487,7 @@ mod walk {
     pub fn chown_tree_fd(top: File, dev: u64, uid: u32, gid: u32) -> io::Result<ChownStats> {
         let mut stats = ChownStats::default();
         let st = fstat(&top)?;
-        if st.st_dev as u64 != dev || !is_dir(&st) {
+        if st_dev(&st) != dev || !is_dir(&st) {
             return Err(denied("top of tree is not the expected directory".into()));
         }
         // SAFETY: fd is open; fchown on a descriptor cannot be redirected.
@@ -507,7 +520,7 @@ mod walk {
             };
             drop(parent);
             let sst = fstat(&sub)?;
-            if sst.st_dev as u64 != dev {
+            if st_dev(&sst) != dev {
                 stats.skipped_other_dev += 1;
                 continue;
             }
