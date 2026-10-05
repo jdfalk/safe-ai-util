@@ -23,3 +23,19 @@ intersect to an empty list, which read as "anything", and they now block the
 command. Listing a conditional command in an overlay's `always_allowed` used
 to drop its restrictions, and they are now kept. See "Using as a sudo gate"
 in the README and `examples/aorg-sandbox-root-policy.toml`.
+
+#### Root policy rules can require safe paths, and `chown -R` is a built-in
+
+Rules can set `require_root_owned_ancestors` and `require_mount`. Before
+running, the gate checks that every directory above the path is root-owned and
+not group/other-writable, and that the path is the expected ZFS mount. It
+matches `/proc/self/mountinfo` against an `fstat` of the path opened with
+`O_NOFOLLOW|O_DIRECTORY`.
+
+The new built-in `exec chown-tree <path>` replaces shelling out to `chown -R`,
+whose symlink behaviour differs between GNU and uutils. It walks the tree with
+`openat(O_NOFOLLOW|O_DIRECTORY)` and `fchownat(AT_SYMLINK_NOFOLLOW)`, and never
+crosses a filesystem boundary.
+
+In the example policy, the data clone now sets `setuid=off`, `devices=off` and
+`exec=off`.

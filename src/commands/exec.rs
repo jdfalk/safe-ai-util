@@ -1,5 +1,5 @@
 // file: src/commands/exec.rs
-// version: 1.0.0
+// version: 1.1.0
 // guid: 7c1a5e93-2b8d-4f60-9e4a-3d6b0f2c8e17
 // last-edited: 2026-10-04
 
@@ -19,7 +19,10 @@
 //! [`ROOT_POLICY_PATH`]: crate::security::root_policy::ROOT_POLICY_PATH
 
 use crate::security::elevation::{check_cli_request, CliRequest, ElevationContext};
-use crate::security::root_policy::{verify_binary, AuthorizedExec, RootPolicy, RootPolicyLoader};
+use crate::security::fs_guard::{ChownStats, FsView, RealFs};
+use crate::security::root_policy::{
+    verify_binary, AuthorizedExec, ExecAction, RootPolicy, RootPolicyLoader,
+};
 use clap::{Arg, ArgMatches, Command};
 use serde::Serialize;
 use std::io::{self, Write};
@@ -35,6 +38,15 @@ pub const EXIT_POLICY: i32 = 78; // EX_CONFIG
 pub const EXIT_AUDIT: i32 = 74; // EX_IOERR
 /// Exit status when an allowed child could not be started.
 pub const EXIT_SPAWN: i32 = 71; // EX_OSERR
+/// Exit status when the built-in `chown-tree` action failed part way.
+pub const EXIT_ACTION_FAILED: i32 = 1;
+
+/// Owners trusted for path preconditions in production: root only.
+const TRUSTED_UIDS: &[u32] = &[0];
+
+/// Signature of the built-in `chown-tree` runner: path, expected device,
+/// owner, group.
+pub type ChownTreeFn<'a> = &'a dyn Fn(&Path, u64, u32, u32) -> io::Result<ChownStats>;
 
 /// Build the `exec` subcommand. All remaining arguments, including ones that
 /// start with `-`, are captured verbatim as the argv to authorize.
@@ -291,6 +303,10 @@ pub struct ExecEnv<'a> {
     /// Resolve and check the binary; returns the path to execute.
     pub verify: &'a dyn Fn(&Path) -> crate::Result<std::path::PathBuf>,
     pub spawn: &'a dyn Fn(&Path, &AuthorizedExec) -> io::Result<ChildExit>,
+    /// Filesystem view for path preconditions.
+    pub fs: &'a dyn FsView,
+    /// Runs the built-in `chown-tree`.
+    pub chown_tree: ChownTreeFn<'a>,
 }
 
 fn refuse(sink: &mut dyn AuditSink, mut entry: ExecLogEntry<'_>, reason: String, code: i32) -> i32 {
@@ -354,10 +370,23 @@ pub fn run_exec(ctx: &ElevationContext, argv: &[String], dry_run: bool, env: Exe
         }
     };
 
-    let binary = match (env.verify)(&auth.binary) {
-        Ok(b) => b,
+    let binary = match auth.action {
+        ExecAction::Spawn => match (env.verify)(&auth.binary) {
+            Ok(b) => b,
+            Err(err) => {
+                let mut e = ExecLogEntry::new(ctx, argv, "refused-binary", dry_run);
+                e.rule = Some(&auth.rule);
+                return refuse(sink, e, err.to_string(), EXIT_REFUSED);
+            }
+        },
+        ExecAction::ChownTree { .. } => auth.binary.clone(),
+    };
+
+    // Path preconditions run last, immediately before the action.
+    let mount_dev = match auth.preconditions.check(env.fs, TRUSTED_UIDS) {
+        Ok(d) => d,
         Err(err) => {
-            let mut e = ExecLogEntry::new(ctx, argv, "refused-binary", dry_run);
+            let mut e = ExecLogEntry::new(ctx, argv, "refused-precondition", dry_run);
             e.rule = Some(&auth.rule);
             return refuse(sink, e, err.to_string(), EXIT_REFUSED);
         }
@@ -383,6 +412,38 @@ pub fn run_exec(ctx: &ElevationContext, argv: &[String], dry_run: bool, env: Exe
     if dry_run {
         println!("ALLOWED (dry run): {} {:?}", binary.display(), auth.args);
         return 0;
+    }
+
+    if let ExecAction::ChownTree { path, owner, group } = &auth.action {
+        let Some(dev) = mount_dev else {
+            // Preconditions for chown-tree always include the mount check.
+            return EXIT_REFUSED;
+        };
+        let mut done = ExecLogEntry::new(ctx, argv, "completed", dry_run);
+        done.rule = Some(&auth.rule);
+        done.binary = Some(binary.display().to_string());
+        let code = match (env.chown_tree)(path, dev, *owner, *group) {
+            Ok(stats) => {
+                done.reason = Some(format!(
+                    "changed={} skipped_other_dev={}",
+                    stats.changed, stats.skipped_other_dev
+                ));
+                0
+            }
+            Err(err) => {
+                done.event = "error";
+                done.reason = Some(format!("chown-tree failed: {}", err));
+                eprintln!(
+                    "safe-ai-util: chown-tree {} failed: {}",
+                    path.display(),
+                    err
+                );
+                EXIT_ACTION_FAILED
+            }
+        };
+        done.exit_code = Some(code);
+        let _ = sink.record(&done);
+        return code;
     }
 
     match (env.spawn)(&binary, &auth) {
@@ -425,6 +486,9 @@ fn system_env_run(ctx: &ElevationContext, argv: &[String], dry_run: bool) -> i32
         ))?))
     };
     let verify = |b: &Path| verify_binary(b, 0);
+    let chown = |p: &Path, dev: u64, uid: u32, gid: u32| {
+        crate::security::fs_guard::chown_tree(p, dev, uid, gid, TRUSTED_UIDS)
+    };
     run_exec(
         ctx,
         argv,
@@ -435,6 +499,8 @@ fn system_env_run(ctx: &ElevationContext, argv: &[String], dry_run: bool) -> i32
             early_sink: &mut early,
             verify: &verify,
             spawn: &spawn_child,
+            fs: &RealFs,
+            chown_tree: &chown,
         },
     )
 }
@@ -520,6 +586,54 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
     }
 
     type SpawnLog = Rc<RefCell<Vec<(PathBuf, Vec<String>, String)>>>;
+    type ChownLog = Rc<RefCell<Vec<(PathBuf, u64, u32, u32)>>>;
+
+    use crate::security::fs_guard::NodeInfo;
+    use std::collections::HashMap;
+
+    /// Fake filesystem with the sandbox layout: /, /mnt, /mnt/aorg-sandbox
+    /// root-owned 0755, and bigdata/rehearsal-sandbox-data mounted at
+    /// /mnt/aorg-sandbox/data as device 0:57.
+    struct SandboxFs {
+        nodes: HashMap<PathBuf, NodeInfo>,
+        mountinfo: String,
+    }
+
+    impl SandboxFs {
+        fn good() -> Self {
+            let d = |uid, mode, dev| NodeInfo {
+                uid,
+                mode,
+                dev,
+                is_dir: true,
+                is_symlink: false,
+            };
+            let mut nodes = HashMap::new();
+            nodes.insert(PathBuf::from("/"), d(0, 0o755, 1));
+            nodes.insert(PathBuf::from("/mnt"), d(0, 0o755, 1));
+            nodes.insert(PathBuf::from("/mnt/aorg-sandbox"), d(0, 0o755, 1));
+            nodes.insert(PathBuf::from("/mnt/aorg-sandbox/data"), d(1000, 0o755, 57));
+            Self {
+                nodes,
+                mountinfo: "95 22 0:57 / /mnt/aorg-sandbox/data rw,nosuid - zfs bigdata/rehearsal-sandbox-data rw\n".into(),
+            }
+        }
+    }
+
+    impl FsView for SandboxFs {
+        fn lstat(&self, p: &Path) -> io::Result<NodeInfo> {
+            self.nodes
+                .get(p)
+                .copied()
+                .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+        }
+        fn dir_fstat(&self, p: &Path) -> io::Result<NodeInfo> {
+            self.lstat(p)
+        }
+        fn mountinfo(&self) -> io::Result<String> {
+            Ok(self.mountinfo.clone())
+        }
+    }
 
     struct Harness {
         _dir: tempfile::TempDir,
@@ -527,6 +641,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
         early: MemSink,
         late: MemSink,
         spawned: SpawnLog,
+        chowned: ChownLog,
+        fs: SandboxFs,
     }
 
     impl Harness {
@@ -549,6 +665,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
                 early: MemSink::default(),
                 late: MemSink::default(),
                 spawned: Rc::default(),
+                chowned: Rc::default(),
+                fs: SandboxFs::good(),
             }
         }
 
@@ -567,6 +685,14 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
                 Ok(0)
             };
             let mut early = self.early.clone();
+            let chowned = self.chowned.clone();
+            let chown = move |p: &Path, dev: u64, uid: u32, gid: u32| -> io::Result<ChownStats> {
+                chowned.borrow_mut().push((p.to_path_buf(), dev, uid, gid));
+                Ok(ChownStats {
+                    changed: 3,
+                    skipped_other_dev: 0,
+                })
+            };
             run_exec(
                 ctx,
                 &argv,
@@ -577,6 +703,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
                     early_sink: &mut early,
                     verify: &verify,
                     spawn: &spawn,
+                    fs: &self.fs,
+                    chown_tree: &chown,
                 },
             )
         }
@@ -705,6 +833,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             binary: PathBuf::from(bin),
             args: vec![],
             child_path: "/usr/bin:/bin".into(),
+            action: ExecAction::Spawn,
+            preconditions: Default::default(),
         };
         assert_eq!(spawn_child(Path::new(bin), &auth).unwrap(), 1);
     }
@@ -717,6 +847,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             binary: PathBuf::from("/usr/bin/env"),
             args: vec![],
             child_path: "/usr/bin:/bin".into(),
+            action: ExecAction::Spawn,
+            preconditions: Default::default(),
         };
         let out = child_command(Path::new("/usr/bin/env"), &auth)
             .output()
@@ -731,6 +863,8 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             binary: PathBuf::from("/bin/echo"),
             args: vec!["a; rm -rf / $(id)".into()],
             child_path: "/usr/bin:/bin".into(),
+            action: ExecAction::Spawn,
+            preconditions: Default::default(),
         };
         let out = child_command(Path::new("/bin/echo"), &auth)
             .output()
@@ -794,5 +928,160 @@ allowed_argv = [["destroy", "bigdata/rehearsal-sandbox-data"]]
             .try_get_matches_from(["exec", "zfs", "--", "destroy", "x"])
             .unwrap();
         assert_eq!(exec_argv(&m), vec!["zfs", "--", "destroy", "x"]);
+    }
+
+    const GUARDED: &str = r#"
+log_file = "/var/log/safe-ai-util/test.log"
+[commands.zfs-clone-data]
+binary = "/usr/sbin/zfs"
+requires_elevation = true
+allowed_argv = [["clone", "-o", "mountpoint=/mnt/aorg-sandbox/data", "snap@x", "bigdata/rehearsal-sandbox-data"]]
+require_root_owned_ancestors = ["/mnt/aorg-sandbox/data"]
+
+[chown_trees.data]
+path = "/mnt/aorg-sandbox/data"
+owner = 1000
+group = 1000
+require_mount_of = "bigdata/rehearsal-sandbox-data"
+"#;
+
+    const CLONE: &[&str] = &[
+        "/usr/sbin/zfs",
+        "clone",
+        "-o",
+        "mountpoint=/mnt/aorg-sandbox/data",
+        "snap@x",
+        "bigdata/rehearsal-sandbox-data",
+    ];
+
+    #[test]
+    fn guarded_clone_runs_when_ancestors_are_root_owned() {
+        let mut h = Harness::new(GUARDED);
+        h.fs.nodes.remove(Path::new("/mnt/aorg-sandbox/data")); // not created yet
+        let root = ElevationContext::sudo_root("u");
+        assert_eq!(h.run(&root, CLONE, false), 0);
+        assert_eq!(h.spawned.borrow().len(), 1);
+    }
+
+    #[test]
+    fn guarded_clone_refused_when_an_ancestor_is_user_writable() {
+        let root = ElevationContext::sudo_root("u");
+        for (path, uid, mode) in [
+            ("/mnt/aorg-sandbox", 1000, 0o755),
+            ("/mnt/aorg-sandbox", 0, 0o777),
+            ("/mnt", 0, 0o775),
+        ] {
+            let mut h = Harness::new(GUARDED);
+            h.fs.nodes.insert(
+                PathBuf::from(path),
+                NodeInfo {
+                    uid,
+                    mode,
+                    dev: 1,
+                    is_dir: true,
+                    is_symlink: false,
+                },
+            );
+            assert_eq!(
+                h.run(&root, CLONE, false),
+                EXIT_REFUSED,
+                "{path} {uid} {mode:o}"
+            );
+            assert!(h.spawned.borrow().is_empty());
+            assert!(h.late.lines.borrow()[0].contains("refused-precondition"));
+        }
+        // Missing ancestor (/mnt/aorg-sandbox not installed) is refused too.
+        let mut h = Harness::new(GUARDED);
+        h.fs.nodes.remove(Path::new("/mnt/aorg-sandbox"));
+        assert_eq!(h.run(&root, CLONE, false), EXIT_REFUSED);
+    }
+
+    #[test]
+    fn chown_tree_runs_on_the_expected_mount() {
+        let mut h = Harness::new(GUARDED);
+        let root = ElevationContext::sudo_root("u");
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            0
+        );
+        assert_eq!(
+            h.chowned.borrow().as_slice(),
+            &[(PathBuf::from("/mnt/aorg-sandbox/data"), 57, 1000, 1000)]
+        );
+        assert!(h.spawned.borrow().is_empty(), "never shells out to chown");
+        let lines = h.late.lines.borrow();
+        assert!(lines[1].contains("changed=3"), "{lines:?}");
+    }
+
+    #[test]
+    fn chown_tree_refused_when_target_is_not_the_mount() {
+        let root = ElevationContext::sudo_root("u");
+
+        // Dataset not mounted: the path is a plain directory.
+        let mut h = Harness::new(GUARDED);
+        h.fs.mountinfo.clear();
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            EXIT_REFUSED
+        );
+        assert!(h.chowned.borrow().is_empty());
+
+        // A different dataset mounted there.
+        let mut h = Harness::new(GUARDED);
+        h.fs.mountinfo =
+            h.fs.mountinfo
+                .replace("rehearsal-sandbox-data", "BD/bigdata/books");
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            EXIT_REFUSED
+        );
+        assert!(h.chowned.borrow().is_empty());
+
+        // Directory at the path is on another device than the mount.
+        let mut h = Harness::new(GUARDED);
+        h.fs.nodes
+            .get_mut(Path::new("/mnt/aorg-sandbox/data"))
+            .unwrap()
+            .dev = 1;
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            EXIT_REFUSED
+        );
+        assert!(h.chowned.borrow().is_empty());
+
+        // Ancestor writable by a non-root user.
+        let mut h = Harness::new(GUARDED);
+        h.fs.nodes
+            .get_mut(Path::new("/mnt/aorg-sandbox"))
+            .unwrap()
+            .uid = 1000;
+        assert_eq!(
+            h.run(&root, &["chown-tree", "/mnt/aorg-sandbox/data"], false),
+            EXIT_REFUSED
+        );
+        assert!(h.chowned.borrow().is_empty());
+    }
+
+    #[test]
+    fn chown_tree_argv_is_exact() {
+        let root = ElevationContext::sudo_root("u");
+        for argv in [
+            &["chown-tree"][..],
+            &["chown-tree", "/mnt/aorg-sandbox"],
+            &["chown-tree", "/mnt/aorg-sandbox/data/"],
+            &["chown-tree", "/mnt/aorg-sandbox/data", "/etc"],
+            &["chown-tree", "-R", "/mnt/aorg-sandbox/data"],
+        ] {
+            let mut h = Harness::new(GUARDED);
+            assert_eq!(h.run(&root, argv, false), EXIT_REFUSED, "{argv:?}");
+            assert!(h.chowned.borrow().is_empty());
+        }
+        // Not without sudo, even as a dry run.
+        let mut h = Harness::new(GUARDED);
+        let user = ElevationContext::unprivileged(1000);
+        assert_eq!(
+            h.run(&user, &["chown-tree", "/mnt/aorg-sandbox/data"], true),
+            EXIT_REFUSED
+        );
     }
 }

@@ -1,5 +1,5 @@
 // file: src/security/root_policy.rs
-// version: 1.0.0
+// version: 1.1.0
 // guid: 9b3e6d21-5c4f-4a8e-b1d7-0e2f8c6a4b59
 // last-edited: 2026-10-04
 
@@ -17,9 +17,10 @@
 use crate::error::{AgentError, Result};
 use crate::security::allowlist::{AllowlistConfig, CommandRestrictions, EnforcementMode};
 use crate::security::elevation::ElevationContext;
+use crate::security::fs_guard::is_clean_absolute;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 /// The only place an elevated run reads its policy from.
 pub const ROOT_POLICY_PATH: &str = "/etc/safe-ai-util/root-policy.toml";
@@ -108,6 +109,82 @@ pub struct RootCommandRule {
     pub forbidden_args: Vec<String>,
     #[serde(default)]
     pub forbidden_patterns: Vec<String>,
+    /// Paths whose every ancestor must be a root-owned directory that is not
+    /// group/other-writable before this rule may run (the path itself need
+    /// not exist, e.g. a clone's future mount point).
+    #[serde(default)]
+    pub require_root_owned_ancestors: Vec<String>,
+    /// Require that a path is currently the mount point of a ZFS dataset.
+    #[serde(default)]
+    pub require_mount: Option<MountRequirement>,
+}
+
+/// `path` must be the mount point of ZFS dataset `dataset`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MountRequirement {
+    pub path: String,
+    pub dataset: String,
+}
+
+/// A built-in recursive ownership change (`exec chown-tree <path>`).
+///
+/// Replaces shelling out to `chown -R`, whose symlink handling differs
+/// between implementations. See [`crate::security::fs_guard`] for the walk.
+/// Every ancestor of `path` must be root-owned and not group/other-writable,
+/// and `path` must be the mount point of `require_mount_of`; both are always
+/// enforced and cannot be turned off.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChownTreeRule {
+    pub path: String,
+    pub owner: u32,
+    pub group: u32,
+    pub require_mount_of: String,
+}
+
+/// Name `exec` uses for the built-in action.
+pub const CHOWN_TREE: &str = "chown-tree";
+
+/// What an authorized invocation does.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExecAction {
+    /// Run `binary` with `args`.
+    Spawn,
+    /// Run the built-in recursive ownership change.
+    ChownTree {
+        path: PathBuf,
+        owner: u32,
+        group: u32,
+    },
+}
+
+/// Filesystem checks that must pass immediately before the action.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Preconditions {
+    pub root_owned_ancestors: Vec<PathBuf>,
+    pub mount: Option<(PathBuf, String)>,
+}
+
+impl Preconditions {
+    /// Run the checks. Returns the device id of the required mount, if any.
+    pub fn check(
+        &self,
+        fs: &dyn crate::security::fs_guard::FsView,
+        trusted_uids: &[u32],
+    ) -> std::io::Result<Option<u64>> {
+        use crate::security::fs_guard::{check_mount_of, check_root_owned_ancestors};
+        for p in &self.root_owned_ancestors {
+            check_root_owned_ancestors(fs, p, trusted_uids)?;
+        }
+        match &self.mount {
+            Some((path, dataset)) => {
+                check_root_owned_ancestors(fs, path, trusted_uids)?;
+                Ok(Some(check_mount_of(fs, path, dataset)?))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 impl RootCommandRule {
@@ -138,6 +215,9 @@ pub struct RootPolicy {
     /// Rules keyed by name (`exec <name> args...`).
     #[serde(default)]
     pub commands: BTreeMap<String, RootCommandRule>,
+    /// Built-in recursive ownership changes (`exec chown-tree <path>`).
+    #[serde(default)]
+    pub chown_trees: BTreeMap<String, ChownTreeRule>,
 }
 
 /// An invocation that passed policy. Holds exactly the argv that will be
@@ -148,6 +228,8 @@ pub struct AuthorizedExec {
     pub binary: PathBuf,
     pub args: Vec<String>,
     pub child_path: String,
+    pub action: ExecAction,
+    pub preconditions: Preconditions,
 }
 
 impl RootPolicy {
@@ -163,8 +245,28 @@ impl RootPolicy {
 
     fn validate(&self) -> Result<()> {
         let forbidden = forbidden_exec_basenames();
-        if self.commands.is_empty() {
+        if self.commands.is_empty() && self.chown_trees.is_empty() {
             return Err(AgentError::config("root policy defines no commands"));
+        }
+        if self.commands.contains_key(CHOWN_TREE) {
+            return Err(AgentError::config(format!(
+                "'{}' is reserved for the built-in action",
+                CHOWN_TREE
+            )));
+        }
+        for (name, t) in &self.chown_trees {
+            if !is_clean_absolute(Path::new(&t.path)) || t.path == "/" {
+                return Err(AgentError::config(format!(
+                    "chown_trees.{}: path must be a canonical absolute path below /",
+                    name
+                )));
+            }
+            if t.require_mount_of.is_empty() {
+                return Err(AgentError::config(format!(
+                    "chown_trees.{}: require_mount_of must name a dataset",
+                    name
+                )));
+            }
         }
         validate_child_path(self.child_path())?;
         if !Path::new(self.log_path()).is_absolute() {
@@ -190,6 +292,24 @@ impl RootPolicy {
                     "rule '{}': needs allowed_argv or allowed_patterns",
                     name
                 )));
+            }
+            let mut guarded: Vec<&String> = rule.require_root_owned_ancestors.iter().collect();
+            if let Some(m) = &rule.require_mount {
+                if m.dataset.is_empty() {
+                    return Err(AgentError::config(format!(
+                        "rule '{}': require_mount.dataset must not be empty",
+                        name
+                    )));
+                }
+                guarded.push(&m.path);
+            }
+            for g in guarded {
+                if !is_clean_absolute(Path::new(g)) || g == "/" {
+                    return Err(AgentError::config(format!(
+                        "rule '{}': guarded path '{}' must be a canonical absolute path below /",
+                        name, g
+                    )));
+                }
             }
             for p in rule.allowed_patterns.iter().chain(&rule.forbidden_patterns) {
                 regex::Regex::new(p).map_err(|e| {
@@ -224,46 +344,119 @@ impl RootPolicy {
 
     /// Decide whether `argv` (`[name-or-binary, args...]`) may run.
     ///
-    /// `argv[0]` is either a rule name or that rule's exact `binary` path.
-    /// The remaining elements are checked as one exact vector; nothing is
-    /// split, joined, unquoted or rewritten, so `"a; rm -rf /"` is one
-    /// argument that matches no template.
+    /// `argv[0]` is a rule name, a rule's exact `binary` path, or
+    /// `chown-tree`. Several rules may share a binary (so different argvs can
+    /// carry different preconditions); the first rule, in name order, whose
+    /// restrictions accept the arguments is used. The remaining elements are
+    /// checked as one exact vector; nothing is split, joined, unquoted or
+    /// rewritten, so `"a; rm -rf /"` is one argument that matches no
+    /// template.
+    ///
+    /// The returned [`Preconditions`] must be checked immediately before the
+    /// action runs.
     pub fn authorize(&self, ctx: &ElevationContext, argv: &[String]) -> Result<AuthorizedExec> {
         let Some((head, args)) = argv.split_first() else {
             return Err(AgentError::security("exec: no command given"));
         };
-        let (name, rule) = self
-            .commands
-            .get_key_value(head.as_str())
-            .or_else(|| self.commands.iter().find(|(_, r)| &r.binary == head))
-            .ok_or_else(|| {
-                AgentError::security(format!("exec: '{}' is not in the root policy", head))
-            })?;
 
-        if rule.requires_elevation && !ctx.is_elevated() {
+        if head == CHOWN_TREE {
+            return self.authorize_chown_tree(ctx, args);
+        }
+
+        let candidates: Vec<(&String, &RootCommandRule)> = self
+            .commands
+            .iter()
+            .filter(|(n, r)| *n == head || &r.binary == head)
+            .collect();
+        if candidates.is_empty() {
             return Err(AgentError::security(format!(
-                "exec: '{}' requires elevation ({})",
-                name,
-                ctx.describe()
+                "exec: '{}' is not in the root policy",
+                head
             )));
         }
 
-        self.as_allowlist()
-            .validate_command_with_mode(name, args, EnforcementMode::Elevated)?;
+        let allowlist = self.as_allowlist();
+        let mut last_err = None;
+        for (name, rule) in candidates {
+            if rule.requires_elevation && !ctx.is_elevated() {
+                last_err = Some(AgentError::security(format!(
+                    "exec: '{}' requires elevation ({})",
+                    name,
+                    ctx.describe()
+                )));
+                continue;
+            }
+            match allowlist.validate_command_with_mode(name, args, EnforcementMode::Elevated) {
+                Ok(()) => {
+                    return Ok(AuthorizedExec {
+                        rule: name.clone(),
+                        binary: PathBuf::from(&rule.binary),
+                        args: args.to_vec(),
+                        child_path: self.child_path().to_string(),
+                        action: ExecAction::Spawn,
+                        preconditions: Preconditions {
+                            root_owned_ancestors: rule
+                                .require_root_owned_ancestors
+                                .iter()
+                                .map(PathBuf::from)
+                                .collect(),
+                            mount: rule
+                                .require_mount
+                                .as_ref()
+                                .map(|m| (PathBuf::from(&m.path), m.dataset.clone())),
+                        },
+                    })
+                }
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(last_err.unwrap_or_else(|| AgentError::security("exec: refused")))
+    }
 
+    fn authorize_chown_tree(
+        &self,
+        ctx: &ElevationContext,
+        args: &[String],
+    ) -> Result<AuthorizedExec> {
+        if !ctx.is_elevated() {
+            return Err(AgentError::security(format!(
+                "exec: '{}' requires elevation ({})",
+                CHOWN_TREE,
+                ctx.describe()
+            )));
+        }
+        let [path] = args else {
+            return Err(AgentError::security(format!(
+                "exec: '{}' takes exactly one argument, the configured path",
+                CHOWN_TREE
+            )));
+        };
+        let (name, t) = self
+            .chown_trees
+            .iter()
+            .find(|(_, t)| &t.path == path)
+            .ok_or_else(|| {
+                AgentError::security(format!(
+                    "exec: '{}' is not a configured chown_trees path",
+                    path
+                ))
+            })?;
         Ok(AuthorizedExec {
-            rule: name.clone(),
-            binary: PathBuf::from(&rule.binary),
+            rule: format!("{}:{}", CHOWN_TREE, name),
+            binary: PathBuf::from(format!("builtin:{}", CHOWN_TREE)),
             args: args.to_vec(),
             child_path: self.child_path().to_string(),
+            action: ExecAction::ChownTree {
+                path: PathBuf::from(&t.path),
+                owner: t.owner,
+                group: t.group,
+            },
+            preconditions: Preconditions {
+                root_owned_ancestors: vec![PathBuf::from(&t.path)],
+                mount: Some((PathBuf::from(&t.path), t.require_mount_of.clone())),
+            },
         })
     }
-}
-
-fn is_clean_absolute(p: &Path) -> bool {
-    p.is_absolute()
-        && p.components()
-            .all(|c| matches!(c, Component::RootDir | Component::Normal(_)))
 }
 
 fn validate_child_path(path: &str) -> Result<()> {
@@ -649,6 +842,7 @@ max_args = 3
         let text = include_str!("../../examples/aorg-sandbox-root-policy.toml");
         let p = RootPolicy::parse(text).expect("example policy parses");
         let root = ElevationContext::sudo_root("jdfalk");
+        let clone_data = "/usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data -o setuid=off -o devices=off -o exec=off bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data";
         let lines = [
             "/usr/sbin/zfs snapshot bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
             "/usr/sbin/zfs destroy bigdata/BD/bigdata/books@rehearsal-sandbox",
@@ -656,26 +850,48 @@ max_args = 3
             "/usr/sbin/zfs destroy bigdata/BD/bigdata/books-sandbox",
             "/usr/sbin/zfs clone bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books-sandbox",
             "/usr/sbin/zfs destroy bigdata/rehearsal-sandbox-data",
-            "/usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data",
-            "/usr/bin/chown -R 1000:1000 /mnt/aorg-sandbox/data",
+            clone_data,
+            "chown-tree /mnt/aorg-sandbox/data",
         ];
         for line in lines {
             let argv: Vec<String> = line.split(' ').map(String::from).collect();
             let ok = p
                 .authorize(&root, &argv)
                 .unwrap_or_else(|e| panic!("{line}: {e}"));
-            assert_eq!(ok.binary.to_str().unwrap(), argv[0]);
-            // Also by rule name.
-            let mut by_name = argv.clone();
-            by_name[0] = Path::new(&argv[0])
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string();
-            assert!(p.authorize(&root, &by_name).is_ok(), "{line} by name");
+            if line == clone_data {
+                assert_eq!(ok.rule, "zfs-clone-sandbox-data");
+                assert_eq!(
+                    ok.preconditions.root_owned_ancestors,
+                    vec![PathBuf::from("/mnt/aorg-sandbox/data")]
+                );
+            } else if line.starts_with("chown-tree") {
+                assert_eq!(
+                    ok.action,
+                    ExecAction::ChownTree {
+                        path: PathBuf::from("/mnt/aorg-sandbox/data"),
+                        owner: 1000,
+                        group: 1000
+                    }
+                );
+                assert_eq!(
+                    ok.preconditions.mount,
+                    Some((
+                        PathBuf::from("/mnt/aorg-sandbox/data"),
+                        "bigdata/rehearsal-sandbox-data".to_string()
+                    ))
+                );
+            } else {
+                assert_eq!(ok.rule, "zfs");
+                assert_eq!(ok.preconditions, Preconditions::default());
+                assert_eq!(ok.binary.to_str().unwrap(), argv[0]);
+            }
         }
-        let total: usize = p.commands.values().map(|r| r.allowed_argv.len()).sum();
+        let total: usize = p
+            .commands
+            .values()
+            .map(|r| r.allowed_argv.len())
+            .sum::<usize>()
+            + p.chown_trees.len();
         assert_eq!(
             total,
             lines.len(),
@@ -683,29 +899,79 @@ max_args = 3
         );
         assert!(p.commands.values().all(|r| r.allowed_patterns.is_empty()));
         assert!(p.commands.values().all(|r| r.requires_elevation));
+        assert!(
+            !p.commands.values().any(|r| r.binary.ends_with("/chown")),
+            "no chown binary is run"
+        );
 
         let refused: &[&[&str]] = &[
-            &["zfs", "destroy", "-r", "bigdata/BD/bigdata/books"],
-            &["zfs", "destroy", "bigdata/BD/bigdata/books"],
-            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data; rm -rf /"],
-            &["zfs", "destroy", "bigdata/rehearsal-sandbox-data", "-r"],
+            &["/usr/sbin/zfs", "destroy", "-r", "bigdata/BD/bigdata/books"],
+            &["/usr/sbin/zfs", "destroy", "bigdata/BD/bigdata/books"],
             &[
-                "zfs",
+                "/usr/sbin/zfs",
+                "destroy",
+                "bigdata/rehearsal-sandbox-data; rm -rf /",
+            ],
+            &[
+                "/usr/sbin/zfs",
+                "destroy",
+                "bigdata/rehearsal-sandbox-data",
+                "-r",
+            ],
+            &[
+                "/usr/sbin/zfs",
                 "destroy",
                 "-R",
                 "bigdata/BD/bigdata/books@rehearsal-sandbox",
             ],
-            &["chown", "-R", "0:0", "/mnt/aorg-sandbox/data"],
-            &["chown", "-R", "1000:1000", "/"],
-            &["chown", "-R", "1000:1000", "/mnt/aorg-sandbox/data", "/etc"],
+            // The data clone without the safety options.
+            &[
+                "/usr/sbin/zfs",
+                "clone",
+                "-o",
+                "mountpoint=/mnt/aorg-sandbox/data",
+                "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
+                "bigdata/rehearsal-sandbox-data",
+            ],
+            &[
+                "/usr/sbin/zfs",
+                "clone",
+                "-o",
+                "mountpoint=/",
+                "-o",
+                "setuid=off",
+                "-o",
+                "devices=off",
+                "-o",
+                "exec=off",
+                "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
+                "bigdata/rehearsal-sandbox-data",
+            ],
+            // By rule name, the data clone is only in its own rule.
             &[
                 "zfs",
                 "clone",
                 "-o",
-                "mountpoint=/",
+                "mountpoint=/mnt/aorg-sandbox/data",
+                "-o",
+                "setuid=off",
+                "-o",
+                "devices=off",
+                "-o",
+                "exec=off",
                 "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
                 "bigdata/rehearsal-sandbox-data",
             ],
+            &[
+                "/usr/bin/chown",
+                "-R",
+                "1000:1000",
+                "/mnt/aorg-sandbox/data",
+            ],
+            &["chown", "-R", "1000:1000", "/mnt/aorg-sandbox/data"],
+            &["chown-tree", "/"],
+            &["chown-tree", "/mnt/aorg-sandbox"],
+            &["chown-tree", "/mnt/aorg-sandbox/data", "/etc"],
         ];
         for argv in refused {
             assert!(
@@ -714,6 +980,28 @@ max_args = 3
                 argv
             );
         }
+    }
+
+    #[test]
+    fn chown_tree_policy_validation() {
+        let bad = [
+            // reserved name
+            "[commands.chown-tree]\nbinary = \"/usr/bin/true\"\nallowed_argv = [[\"x\"]]\n",
+            // root path
+            "[chown_trees.t]\npath = \"/\"\nowner = 1\ngroup = 1\nrequire_mount_of = \"d\"\n",
+            // relative / dotted
+            "[chown_trees.t]\npath = \"/mnt/../etc\"\nowner = 1\ngroup = 1\nrequire_mount_of = \"d\"\n",
+            // missing mount requirement
+            "[chown_trees.t]\npath = \"/mnt/x\"\nowner = 1\ngroup = 1\n",
+            "[chown_trees.t]\npath = \"/mnt/x\"\nowner = 1\ngroup = 1\nrequire_mount_of = \"\"\n",
+            // guarded path on a command must be canonical
+            "[commands.zfs]\nbinary = \"/usr/sbin/zfs\"\nallowed_argv = [[\"x\"]]\nrequire_root_owned_ancestors = [\"/mnt/./x\"]\n",
+        ];
+        for text in bad {
+            assert!(RootPolicy::parse(text).is_err(), "{text}");
+        }
+        let ok = "[chown_trees.t]\npath = \"/mnt/x\"\nowner = 1\ngroup = 1\nrequire_mount_of = \"pool/x\"\n";
+        assert!(RootPolicy::parse(ok).is_ok());
     }
 
     #[cfg(unix)]

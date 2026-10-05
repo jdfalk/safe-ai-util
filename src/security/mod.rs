@@ -1,5 +1,5 @@
 // file: src/security/mod.rs
-// version: 1.2.0
+// version: 1.3.0
 // guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 // last-edited: 2026-10-04
 
@@ -10,6 +10,7 @@
 
 pub mod allowlist;
 pub mod elevation;
+pub mod fs_guard;
 pub mod root_policy;
 pub mod sanitizer;
 pub mod validator;
