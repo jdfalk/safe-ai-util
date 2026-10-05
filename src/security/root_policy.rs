@@ -1,5 +1,5 @@
 // file: src/security/root_policy.rs
-// version: 1.2.0
+// version: 1.2.1
 // guid: 9b3e6d21-5c4f-4a8e-b1d7-0e2f8c6a4b59
 // last-edited: 2026-10-04
 
@@ -899,12 +899,13 @@ max_args = 3
         let p = RootPolicy::parse(text).expect("example policy parses");
         let root = ElevationContext::sudo_root("jdfalk");
         let clone_data = "/usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/data -o setuid=off -o devices=off -o exec=off -o snapdir=hidden -o sharenfs=off -o sharesmb=off bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox bigdata/rehearsal-sandbox-data";
+        let clone_media = "/usr/sbin/zfs clone -o mountpoint=/mnt/aorg-sandbox/media -o setuid=off -o devices=off -o snapdir=hidden -o sharenfs=off -o sharesmb=off bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books-sandbox";
         let lines = [
             "/usr/sbin/zfs snapshot bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
             "/usr/sbin/zfs destroy bigdata/BD/bigdata/books@rehearsal-sandbox",
             "/usr/sbin/zfs destroy bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
             "/usr/sbin/zfs destroy bigdata/BD/bigdata/books-sandbox",
-            "/usr/sbin/zfs clone bigdata/BD/bigdata/books@rehearsal-sandbox bigdata/BD/bigdata/books-sandbox",
+            clone_media,
             "/usr/sbin/zfs destroy bigdata/rehearsal-sandbox-data",
             clone_data,
             "chown-tree /mnt/aorg-sandbox/data",
@@ -914,7 +915,13 @@ max_args = 3
             let ok = p
                 .authorize(&root, &argv)
                 .unwrap_or_else(|e| panic!("{line}: {e}"));
-            if line == clone_data {
+            if line == clone_media {
+                assert_eq!(ok.rule, "zfs-clone-sandbox-media");
+                assert_eq!(
+                    ok.preconditions.root_owned_ancestors,
+                    vec![PathBuf::from("/mnt/aorg-sandbox/media")]
+                );
+            } else if line == clone_data {
                 assert_eq!(ok.rule, "zfs-clone-sandbox-data");
                 assert_eq!(
                     ok.preconditions.root_owned_ancestors,
@@ -1002,6 +1009,32 @@ max_args = 3
                 "exec=off",
                 "bigdata/BD/bigdata/books/ao-appdata@rehearsal-sandbox",
                 "bigdata/rehearsal-sandbox-data",
+            ],
+            // The media clone without an explicit mount point (it would mount
+            // at the inherited, non-root-writable /mnt/bigdata/books-sandbox).
+            &[
+                "/usr/sbin/zfs",
+                "clone",
+                "bigdata/BD/bigdata/books@rehearsal-sandbox",
+                "bigdata/BD/bigdata/books-sandbox",
+            ],
+            &[
+                "/usr/sbin/zfs",
+                "clone",
+                "-o",
+                "mountpoint=/mnt/bigdata/books-sandbox",
+                "-o",
+                "setuid=off",
+                "-o",
+                "devices=off",
+                "-o",
+                "snapdir=hidden",
+                "-o",
+                "sharenfs=off",
+                "-o",
+                "sharesmb=off",
+                "bigdata/BD/bigdata/books@rehearsal-sandbox",
+                "bigdata/BD/bigdata/books-sandbox",
             ],
             // The data clone without the snapdir/share options.
             &[
