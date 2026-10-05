@@ -1,5 +1,5 @@
 // file: src/security/fs_guard.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: 3a7e1c95-6d2b-4f08-8c4e-b1f9d0a26e73
 // last-edited: 2026-10-04
 
@@ -785,8 +785,14 @@ mod tests {
             unsafe { (libc::geteuid(), libc::getegid()) }
         }
 
+        /// A scratch directory whose ancestors are not group/other-writable.
+        /// The system temp dir does not qualify on Linux (`/tmp` is 1777),
+        /// so use the crate's target directory instead.
         fn canon_tmp() -> (tempfile::TempDir, PathBuf) {
-            let d = tempfile::tempdir().unwrap();
+            let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/fs-guard-tests");
+            std::fs::create_dir_all(&base).unwrap();
+            std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o755)).unwrap();
+            let d = tempfile::tempdir_in(&base).unwrap();
             std::fs::set_permissions(d.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
             let c = d.path().canonicalize().unwrap();
             (d, c)
