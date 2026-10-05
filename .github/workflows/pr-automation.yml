@@ -1,6 +1,7 @@
 # file: .github/workflows/pr-automation.yml
-# version: 1.0.2
+# version: 1.0.3
 # guid: a7b8c9d0-e1f2-3456-a789-0123456789bc
+# last-edited: 2026-10-04
 
 name: PR Automation
 
@@ -58,8 +59,9 @@ jobs:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: false
-          VALIDATE_RUST_2015: false
-          VALIDATE_RUST_2018: false
+          # Super-linter v8 refuses a mix of VALIDATE_*=true and =false. With
+          # only =true entries, every other linter (RUST_2015/2018 included)
+          # is off.
           VALIDATE_RUST_2021: true
           VALIDATE_YAML: true
           VALIDATE_JSON: true
