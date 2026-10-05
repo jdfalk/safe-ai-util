@@ -1,5 +1,5 @@
 // file: src/commands/exec.rs
-// version: 1.1.0
+// version: 1.1.1
 // guid: 7c1a5e93-2b8d-4f60-9e4a-3d6b0f2c8e17
 // last-edited: 2026-10-04
 
@@ -966,7 +966,7 @@ require_mount_of = "bigdata/rehearsal-sandbox-data"
     #[test]
     fn guarded_clone_refused_when_an_ancestor_is_user_writable() {
         let root = ElevationContext::sudo_root("u");
-        for (path, uid, mode) in [
+        for (path, owner, mode) in [
             ("/mnt/aorg-sandbox", 1000, 0o755),
             ("/mnt/aorg-sandbox", 0, 0o777),
             ("/mnt", 0, 0o775),
@@ -975,7 +975,7 @@ require_mount_of = "bigdata/rehearsal-sandbox-data"
             h.fs.nodes.insert(
                 PathBuf::from(path),
                 NodeInfo {
-                    uid,
+                    uid: owner,
                     mode,
                     dev: 1,
                     is_dir: true,
@@ -985,7 +985,7 @@ require_mount_of = "bigdata/rehearsal-sandbox-data"
             assert_eq!(
                 h.run(&root, CLONE, false),
                 EXIT_REFUSED,
-                "{path} {uid} {mode:o}"
+                "{path} owner={owner} mode={mode:o}"
             );
             assert!(h.spawned.borrow().is_empty());
             assert!(h.late.lines.borrow()[0].contains("refused-precondition"));
