@@ -1,6 +1,7 @@
 // file: src/commands/sed.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: 8a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::{anyhow, Result};
@@ -14,57 +15,77 @@ use std::path::Path;
 pub fn build_command() -> Command {
     Command::new("sed")
         .about("Stream editor for filtering and transforming text (Rust implementation)")
-        .arg(Arg::new("expression")
-            .help("Sed expression/script")
-            .short('e')
-            .long("expression")
-            .action(clap::ArgAction::Append))
-        .arg(Arg::new("file")
-            .help("Input files")
-            .action(clap::ArgAction::Append))
-        .arg(Arg::new("in-place")
-            .help("Edit files in place")
-            .short('i')
-            .long("in-place")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("backup")
-            .help("Backup suffix for in-place editing")
-            .long("backup")
-            .value_name("SUFFIX"))
-        .arg(Arg::new("quiet")
-            .help("Suppress automatic printing of pattern space")
-            .short('n')
-            .long("quiet")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("extended-regexp")
-            .help("Use extended regular expressions")
-            .short('r')
-            .long("extended-regexp")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("separate")
-            .help("Consider files separately")
-            .short('s')
-            .long("separate")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("unbuffered")
-            .help("Load minimal amounts of data and flush output buffers more often")
-            .short('u')
-            .long("unbuffered")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("null-data")
-            .help("Separate lines by NUL characters")
-            .short('z')
-            .long("null-data")
-            .action(clap::ArgAction::SetTrue))
+        .arg(
+            Arg::new("expression")
+                .help("Sed expression/script")
+                .short('e')
+                .long("expression")
+                .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("file")
+                .help("Input files")
+                .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("in-place")
+                .help("Edit files in place")
+                .short('i')
+                .long("in-place")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("backup")
+                .help("Backup suffix for in-place editing")
+                .long("backup")
+                .value_name("SUFFIX"),
+        )
+        .arg(
+            Arg::new("quiet")
+                .help("Suppress automatic printing of pattern space")
+                .short('n')
+                .long("quiet")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("extended-regexp")
+                .help("Use extended regular expressions")
+                .short('r')
+                .long("extended-regexp")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("separate")
+                .help("Consider files separately")
+                .short('s')
+                .long("separate")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("unbuffered")
+                .help("Load minimal amounts of data and flush output buffers more often")
+                .short('u')
+                .long("unbuffered")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("null-data")
+                .help("Separate lines by NUL characters")
+                .short('z')
+                .long("null-data")
+                .action(clap::ArgAction::SetTrue),
+        )
 }
 
 /// Execute sed commands with Rust-native implementation
 pub async fn execute(matches: &ArgMatches, _executor: &Executor) -> Result<()> {
-    let expressions: Vec<_> = matches.get_many::<String>("expression")
+    let expressions: Vec<_> = matches
+        .get_many::<String>("expression")
         .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
-    let files: Vec<_> = matches.get_many::<String>("file")
+    let files: Vec<_> = matches
+        .get_many::<String>("file")
         .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
@@ -290,12 +311,13 @@ fn parse_substitute_command(expr: &str, extended_regexp: bool) -> Result<SedOper
 /// Convert basic regex to extended regex (simplified conversion)
 fn convert_basic_to_extended_regex(basic: &str) -> String {
     // This is a simplified conversion - sed basic regex is quite complex
-    basic.replace("\\(", "(")
-         .replace("\\)", ")")
-         .replace("\\+", "+")
-         .replace("\\?", "?")
-         .replace("\\{", "{")
-         .replace("\\}", "}")
+    basic
+        .replace("\\(", "(")
+        .replace("\\)", ")")
+        .replace("\\+", "+")
+        .replace("\\?", "?")
+        .replace("\\{", "{")
+        .replace("\\}", "}")
 }
 
 /// Process input with sed operations
@@ -309,7 +331,14 @@ fn process_input(
 ) -> Result<()> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    process_input_to_writer(reader, operations, &mut handle, quiet, null_data, unbuffered)
+    process_input_to_writer(
+        reader,
+        operations,
+        &mut handle,
+        quiet,
+        null_data,
+        unbuffered,
+    )
 }
 
 /// Process input to a writer
@@ -346,20 +375,26 @@ fn process_input_to_writer<W: Write>(
             }
 
             match operation {
-                SedOperation::Substitute { pattern, replacement, flags } => {
+                SedOperation::Substitute {
+                    pattern,
+                    replacement,
+                    flags,
+                } => {
                     if flags.global {
                         line_str = pattern.replace_all(&line_str, replacement).to_string();
                     } else if let Some(n) = flags.numeric {
                         // Replace only the nth occurrence
                         let mut count = 0;
-                        line_str = pattern.replace_all(&line_str, |_: &regex::Captures| {
-                            count += 1;
-                            if count == n {
-                                replacement.clone()
-                            } else {
-                                line_str.to_string()// This is wrong, need to fix
-                            }
-                        }).to_string();
+                        line_str = pattern
+                            .replace_all(&line_str, |_: &regex::Captures| {
+                                count += 1;
+                                if count == n {
+                                    replacement.clone()
+                                } else {
+                                    line_str.to_string() // This is wrong, need to fix
+                                }
+                            })
+                            .to_string();
                     } else {
                         // Replace only first occurrence
                         line_str = pattern.replace(&line_str, replacement).to_string();

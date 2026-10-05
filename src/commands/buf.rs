@@ -1,6 +1,7 @@
 // file: src/commands/buf.rs
-// version: 1.1.1
+// version: 1.1.2
 // guid: 7e8f9a0b-1c2d-3e4f-5a6b-7c8d9e0f1a2b
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::Result;
@@ -194,10 +195,12 @@ async fn execute_format(matches: &ArgMatches, executor: &Executor) -> Result<()>
 
 async fn execute_breaking(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let against = matches.get_one::<String>("against").unwrap();
-    let args = ["buf".to_string(),
+    let args = [
+        "buf".to_string(),
         "breaking".to_string(),
         "--against".to_string(),
-        against.clone()];
+        against.clone(),
+    ];
 
     info!("Checking for breaking changes against: {}", against);
     executor.execute_secure("buf", &args[1..]).await

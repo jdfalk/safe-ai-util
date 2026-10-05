@@ -1,6 +1,7 @@
 // file: src/commands/linter.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: fa968456-1f5c-4092-a80d-58124e3660ee
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::Result;
@@ -243,11 +244,9 @@ async fn execute_buf_lint(matches: &ArgMatches, executor: &Executor) -> Result<(
 
     info!("Running buf lint on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -269,11 +268,9 @@ async fn execute_eslint(matches: &ArgMatches, executor: &Executor) -> Result<()>
 
     info!("Running ESLint on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -281,18 +278,21 @@ async fn execute_flake8(matches: &ArgMatches, executor: &Executor) -> Result<()>
     let path = matches.get_one::<String>("path").unwrap();
     let max_line_length = matches.get_one::<String>("max-line-length").unwrap();
 
-    let mut args = vec!["flake8".to_string(), "--max-line-length".to_string(), max_line_length.to_string(), path.to_string()];
+    let mut args = vec![
+        "flake8".to_string(),
+        "--max-line-length".to_string(),
+        max_line_length.to_string(),
+        path.to_string(),
+    ];
 
     // Append additional arguments from environment variable
     args = append_additional_args(args);
 
     info!("Running flake8 on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -309,11 +309,9 @@ async fn execute_mypy(matches: &ArgMatches, executor: &Executor) -> Result<()> {
 
     info!("Running mypy on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -328,24 +326,30 @@ async fn execute_clippy(matches: &ArgMatches, executor: &Executor) -> Result<()>
         args.push("--all-features".to_string());
     }
 
-    args.extend(vec!["--".to_string(), "-D".to_string(), "warnings".to_string()]);
+    args.extend(vec![
+        "--".to_string(),
+        "-D".to_string(),
+        "warnings".to_string(),
+    ]);
 
     // Append additional arguments from environment variable
     args = append_additional_args(args);
 
     info!("Running cargo clippy");
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
 async fn execute_golangci_lint(matches: &ArgMatches, executor: &Executor) -> Result<()> {
     let path = matches.get_one::<String>("path").unwrap();
-    let mut args = vec!["golangci-lint".to_string(), "run".to_string(), path.to_string()];
+    let mut args = vec![
+        "golangci-lint".to_string(),
+        "run".to_string(),
+        path.to_string(),
+    ];
 
     if matches.get_flag("fix") {
         args.push("--fix".to_string());
@@ -356,11 +360,9 @@ async fn execute_golangci_lint(matches: &ArgMatches, executor: &Executor) -> Res
 
     info!("Running golangci-lint on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -368,18 +370,21 @@ async fn execute_shellcheck(matches: &ArgMatches, executor: &Executor) -> Result
     let path = matches.get_one::<String>("path").unwrap();
     let format = matches.get_one::<String>("format").unwrap();
 
-    let mut args = vec!["shellcheck".to_string(), "--format".to_string(), format.to_string(), path.to_string()];
+    let mut args = vec![
+        "shellcheck".to_string(),
+        "--format".to_string(),
+        format.to_string(),
+        path.to_string(),
+    ];
 
     // Append additional arguments from environment variable
     args = append_additional_args(args);
 
     info!("Running ShellCheck on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -392,11 +397,9 @@ async fn execute_hadolint(matches: &ArgMatches, executor: &Executor) -> Result<(
 
     info!("Running Hadolint on: {}", dockerfile);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -413,11 +416,9 @@ async fn execute_yamllint(matches: &ArgMatches, executor: &Executor) -> Result<(
 
     info!("Running yamllint on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -434,11 +435,9 @@ async fn execute_markdownlint(matches: &ArgMatches, executor: &Executor) -> Resu
 
     info!("Running markdownlint on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -486,9 +485,9 @@ async fn execute_all_linters(matches: &ArgMatches, executor: &Executor) -> Resul
     for (name, args) in linters {
         info!("Running {}", name);
         match match args.first() {
-     Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
-     None => anyhow::bail!("No command specified")
- } {
+            Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+            None => anyhow::bail!("No command specified"),
+        } {
             Ok(_) => info!("{}: ✅ Passed", name),
             Err(e) => {
                 debug!("{}: ❌ Failed: {}", name, e);

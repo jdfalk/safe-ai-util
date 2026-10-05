@@ -1,6 +1,7 @@
 // file: src/commands/editor.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: 0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::Result;
@@ -24,38 +25,46 @@ pub fn build_command() -> Command {
         .alias("vi")
         .alias("vim")
         .alias("nano")
-        .arg(Arg::new("file")
-            .help("File to edit")
-            .required(true))
-        .arg(Arg::new("line")
-            .help("Start at line number")
-            .short('l')
-            .long("line")
-            .value_name("NUMBER"))
-        .arg(Arg::new("column")
-            .help("Start at column number")
-            .short('c')
-            .long("column")
-            .value_name("NUMBER"))
-        .arg(Arg::new("readonly")
-            .help("Open in read-only mode")
-            .short('r')
-            .long("readonly")
-            .action(clap::ArgAction::SetTrue))
-        .arg(Arg::new("syntax")
-            .help("Syntax highlighting language")
-            .short('s')
-            .long("syntax")
-            .value_name("LANG"))
+        .arg(Arg::new("file").help("File to edit").required(true))
+        .arg(
+            Arg::new("line")
+                .help("Start at line number")
+                .short('l')
+                .long("line")
+                .value_name("NUMBER"),
+        )
+        .arg(
+            Arg::new("column")
+                .help("Start at column number")
+                .short('c')
+                .long("column")
+                .value_name("NUMBER"),
+        )
+        .arg(
+            Arg::new("readonly")
+                .help("Open in read-only mode")
+                .short('r')
+                .long("readonly")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("syntax")
+                .help("Syntax highlighting language")
+                .short('s')
+                .long("syntax")
+                .value_name("LANG"),
+        )
 }
 
 /// Execute the custom Rust editor
 pub async fn execute(matches: &ArgMatches, _executor: &Executor) -> Result<()> {
     let file_path = matches.get_one::<String>("file").unwrap();
-    let start_line = matches.get_one::<String>("line")
+    let start_line = matches
+        .get_one::<String>("line")
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(1);
-    let start_column = matches.get_one::<String>("column")
+    let start_column = matches
+        .get_one::<String>("column")
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(1);
     let readonly = matches.get_flag("readonly");
@@ -217,9 +226,9 @@ impl RustEditor {
 
     fn draw_rust_syntax(&self, line: &str) -> Result<()> {
         let keywords = [
-            "fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait",
-            "pub", "use", "mod", "crate", "super", "self", "Self", "match", "if", "else",
-            "for", "while", "loop", "break", "continue", "return", "async", "await",
+            "fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait", "pub", "use",
+            "mod", "crate", "super", "self", "Self", "match", "if", "else", "for", "while", "loop",
+            "break", "continue", "return", "async", "await",
         ];
 
         self.highlight_keywords(line, &keywords, Color::Blue)?;
@@ -228,9 +237,9 @@ impl RustEditor {
 
     fn draw_python_syntax(&self, line: &str) -> Result<()> {
         let keywords = [
-            "def", "class", "if", "elif", "else", "for", "while", "try", "except",
-            "finally", "with", "as", "import", "from", "return", "yield", "pass",
-            "break", "continue", "lambda", "and", "or", "not", "in", "is",
+            "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally",
+            "with", "as", "import", "from", "return", "yield", "pass", "break", "continue",
+            "lambda", "and", "or", "not", "in", "is",
         ];
 
         self.highlight_keywords(line, &keywords, Color::Blue)?;
@@ -239,9 +248,9 @@ impl RustEditor {
 
     fn draw_javascript_syntax(&self, line: &str) -> Result<()> {
         let keywords = [
-            "function", "var", "let", "const", "if", "else", "for", "while", "do",
-            "switch", "case", "default", "break", "continue", "return", "try", "catch",
-            "finally", "throw", "new", "this", "class", "extends", "async", "await",
+            "function", "var", "let", "const", "if", "else", "for", "while", "do", "switch",
+            "case", "default", "break", "continue", "return", "try", "catch", "finally", "throw",
+            "new", "this", "class", "extends", "async", "await",
         ];
 
         self.highlight_keywords(line, &keywords, Color::Blue)?;
@@ -250,9 +259,28 @@ impl RustEditor {
 
     fn draw_go_syntax(&self, line: &str) -> Result<()> {
         let keywords = [
-            "func", "var", "const", "type", "struct", "interface", "if", "else",
-            "for", "range", "switch", "case", "default", "break", "continue",
-            "return", "go", "defer", "select", "chan", "make", "new",
+            "func",
+            "var",
+            "const",
+            "type",
+            "struct",
+            "interface",
+            "if",
+            "else",
+            "for",
+            "range",
+            "switch",
+            "case",
+            "default",
+            "break",
+            "continue",
+            "return",
+            "go",
+            "defer",
+            "select",
+            "chan",
+            "make",
+            "new",
         ];
 
         self.highlight_keywords(line, &keywords, Color::Blue)?;
@@ -361,7 +389,10 @@ impl RustEditor {
 
         let right_status = format!(
             " {} | {}/{} ",
-            Path::new(&self.file_path).file_name().unwrap_or_default().to_string_lossy(),
+            Path::new(&self.file_path)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy(),
             self.cursor_line + 1,
             self.content.len()
         );
@@ -395,7 +426,8 @@ impl RustEditor {
         match key_event.code {
             KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.modified {
-                    self.status_message = "File has unsaved changes! Use Ctrl+Q again to force quit.".to_string();
+                    self.status_message =
+                        "File has unsaved changes! Use Ctrl+Q again to force quit.".to_string();
                     return Ok(false);
                 }
                 return Ok(true); // Exit
@@ -499,10 +531,8 @@ impl RustEditor {
             KeyCode::Char(c) => {
                 self.status_message.push(c);
             }
-            KeyCode::Backspace => {
-                if self.status_message.len() > 1 {
-                    self.status_message.pop();
-                }
+            KeyCode::Backspace if self.status_message.len() > 1 => {
+                self.status_message.pop();
             }
             _ => {}
         }
@@ -526,10 +556,8 @@ impl RustEditor {
             KeyCode::Char(c) => {
                 self.status_message.push(c);
             }
-            KeyCode::Backspace => {
-                if self.status_message.len() > 1 {
-                    self.status_message.pop();
-                }
+            KeyCode::Backspace if self.status_message.len() > 1 => {
+                self.status_message.pop();
             }
             _ => {}
         }
@@ -570,7 +598,8 @@ impl RustEditor {
         match command.as_str() {
             "q" | "quit" => {
                 if self.modified {
-                    self.status_message = "File has unsaved changes! Use :q! to force quit.".to_string();
+                    self.status_message =
+                        "File has unsaved changes! Use :q! to force quit.".to_string();
                     return Ok(false);
                 }
                 return Ok(true);
@@ -597,7 +626,10 @@ impl RustEditor {
 
     // Editor operations
     fn get_current_line(&self) -> &str {
-        self.content.get(self.cursor_line).map(|s| s.as_str()).unwrap_or("")
+        self.content
+            .get(self.cursor_line)
+            .map(|s| s.as_str())
+            .unwrap_or("")
     }
 
     fn get_current_line_mut(&mut self) -> &mut String {
@@ -758,7 +790,8 @@ impl RustEditor {
     }
 
     fn paste(&mut self) {
-        self.content.insert(self.cursor_line + 1, self.clipboard.clone());
+        self.content
+            .insert(self.cursor_line + 1, self.clipboard.clone());
         self.cursor_line += 1;
         self.cursor_col = 0;
         self.modified = true;

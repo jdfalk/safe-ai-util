@@ -1,6 +1,7 @@
 // file: src/security/allowlist.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: e5f6a7b8-c9d0-1234-ef56-567890123456
+// last-edited: 2026-10-04
 
 //! Command allowlist management module
 //!
@@ -164,13 +165,33 @@ impl AllowlistConfig {
     /// Add safe development commands to the allowlist
     fn add_safe_development_commands(&mut self) {
         let safe_commands = [
-            "git", "buf", "cargo", "rustc", "rustfmt", "clippy",
-            "go", "gofmt", "goimports", "golint",
-            "node", "npm", "yarn", "pnpm", "npx",
-            "python", "python3", "pip", "pip3",
-            "make", "cmake", "ninja",
-            "mvn", "gradle", "sbt",
-            "dotnet", "nuget",
+            "git",
+            "buf",
+            "cargo",
+            "rustc",
+            "rustfmt",
+            "clippy",
+            "go",
+            "gofmt",
+            "goimports",
+            "golint",
+            "node",
+            "npm",
+            "yarn",
+            "pnpm",
+            "npx",
+            "python",
+            "python3",
+            "pip",
+            "pip3",
+            "make",
+            "cmake",
+            "ninja",
+            "mvn",
+            "gradle",
+            "sbt",
+            "dotnet",
+            "nuget",
         ];
 
         for cmd in &safe_commands {
@@ -181,10 +202,9 @@ impl AllowlistConfig {
     /// Add safe file operation commands
     fn add_safe_file_commands(&mut self) {
         let file_commands = [
-            "ls", "cat", "head", "tail", "wc", "sort", "uniq",
-            "grep", "awk", "sed", "cut", "tr", "tee",
-            "find", "locate", "which", "whereis", "type",
-            "file", "stat", "du", "df", "pwd", "dirname", "basename",
+            "ls", "cat", "head", "tail", "wc", "sort", "uniq", "grep", "awk", "sed", "cut", "tr",
+            "tee", "find", "locate", "which", "whereis", "type", "file", "stat", "du", "df", "pwd",
+            "dirname", "basename",
         ];
 
         for cmd in &file_commands {
@@ -195,53 +215,62 @@ impl AllowlistConfig {
     /// Add commands that are conditionally allowed
     fn add_conditional_commands(&mut self) {
         // Docker with restrictions
-        self.conditionally_allowed.insert("docker".to_string(), CommandRestrictions {
-            max_args: Some(20),
-            required_args: vec![],
-            forbidden_args: vec!["--privileged".to_string()],
-            allowed_patterns: vec![],
-            forbidden_patterns: vec![
-                r"--user.*root".to_string(),
-                r"--volume.*:/".to_string(),
-                r"--mount.*source=/".to_string(),
-            ],
-            requires_elevation: false,
-            custom_validator: Some("validate_docker".to_string()),
-        });
+        self.conditionally_allowed.insert(
+            "docker".to_string(),
+            CommandRestrictions {
+                max_args: Some(20),
+                required_args: vec![],
+                forbidden_args: vec!["--privileged".to_string()],
+                allowed_patterns: vec![],
+                forbidden_patterns: vec![
+                    r"--user.*root".to_string(),
+                    r"--volume.*:/".to_string(),
+                    r"--mount.*source=/".to_string(),
+                ],
+                requires_elevation: false,
+                custom_validator: Some("validate_docker".to_string()),
+            },
+        );
 
         // Python with restrictions (no -c flag)
-        self.conditionally_allowed.insert("python".to_string(), CommandRestrictions {
-            max_args: Some(10),
-            required_args: vec![],
-            forbidden_args: vec!["-c".to_string(), "--command".to_string()],
-            allowed_patterns: vec![],
-            forbidden_patterns: vec![r"-c\s+".to_string()],
-            requires_elevation: false,
-            custom_validator: Some("validate_python".to_string()),
-        });
+        self.conditionally_allowed.insert(
+            "python".to_string(),
+            CommandRestrictions {
+                max_args: Some(10),
+                required_args: vec![],
+                forbidden_args: vec!["-c".to_string(), "--command".to_string()],
+                allowed_patterns: vec![],
+                forbidden_patterns: vec![r"-c\s+".to_string()],
+                requires_elevation: false,
+                custom_validator: Some("validate_python".to_string()),
+            },
+        );
 
         // File operations with restrictions
         for cmd in &["cp", "mv", "rm", "mkdir", "rmdir"] {
-            self.conditionally_allowed.insert(cmd.to_string(), CommandRestrictions {
-                max_args: Some(100),
-                required_args: vec![],
-                forbidden_args: vec![],
-                allowed_patterns: vec![],
-                forbidden_patterns: vec![
-                    r"^/etc/".to_string(),
-                    r"^/bin/".to_string(),
-                    r"^/sbin/".to_string(),
-                    r"^/usr/bin/".to_string(),
-                    r"^/usr/sbin/".to_string(),
-                    r"^/boot/".to_string(),
-                    r"^/root/".to_string(),
-                    r"^/sys/".to_string(),
-                    r"^/proc/".to_string(),
-                    r"^/dev/".to_string(),
-                ],
-                requires_elevation: false,
-                custom_validator: Some("validate_file_ops".to_string()),
-            });
+            self.conditionally_allowed.insert(
+                cmd.to_string(),
+                CommandRestrictions {
+                    max_args: Some(100),
+                    required_args: vec![],
+                    forbidden_args: vec![],
+                    allowed_patterns: vec![],
+                    forbidden_patterns: vec![
+                        r"^/etc/".to_string(),
+                        r"^/bin/".to_string(),
+                        r"^/sbin/".to_string(),
+                        r"^/usr/bin/".to_string(),
+                        r"^/usr/sbin/".to_string(),
+                        r"^/boot/".to_string(),
+                        r"^/root/".to_string(),
+                        r"^/sys/".to_string(),
+                        r"^/proc/".to_string(),
+                        r"^/dev/".to_string(),
+                    ],
+                    requires_elevation: false,
+                    custom_validator: Some("validate_file_ops".to_string()),
+                },
+            );
         }
     }
 
@@ -477,19 +506,19 @@ impl AllowlistConfig {
                     )));
                 }
 
-                let base_restr = self
-                    .conditionally_allowed
-                    .get(cmd)
-                    .cloned()
-                    .unwrap_or_else(|| CommandRestrictions {
-                        max_args: None,
-                        required_args: vec![],
-                        forbidden_args: vec![],
-                        allowed_patterns: vec![],
-                        forbidden_patterns: vec![],
-                        requires_elevation: false,
-                        custom_validator: None,
-                    });
+                let base_restr =
+                    self.conditionally_allowed
+                        .get(cmd)
+                        .cloned()
+                        .unwrap_or_else(|| CommandRestrictions {
+                            max_args: None,
+                            required_args: vec![],
+                            forbidden_args: vec![],
+                            allowed_patterns: vec![],
+                            forbidden_patterns: vec![],
+                            requires_elevation: false,
+                            custom_validator: None,
+                        });
 
                 let tightened = tighten_restrictions(&base_restr, overlay_restr);
                 merged.conditionally_allowed.insert(cmd.clone(), tightened);
@@ -531,7 +560,10 @@ fn tighten_restrictions(
         }
     }
 
-    let allowed_pat = match (base.allowed_patterns.is_empty(), overlay.allowed_patterns.is_empty()) {
+    let allowed_pat = match (
+        base.allowed_patterns.is_empty(),
+        overlay.allowed_patterns.is_empty(),
+    ) {
         (true, _) => overlay.allowed_patterns.clone(),
         (_, true) => base.allowed_patterns.clone(),
         (false, false) => base
@@ -587,10 +619,14 @@ mod tests {
         let config = AllowlistConfig::secure_default();
 
         // Should allow safe git commands
-        assert!(config.validate_command("git", &["status".to_string()]).is_ok());
+        assert!(config
+            .validate_command("git", &["status".to_string()])
+            .is_ok());
 
         // Should block dangerous python usage
-        assert!(config.validate_command("python", &["-c".to_string(), "print('hi')".to_string()]).is_err());
+        assert!(config
+            .validate_command("python", &["-c".to_string(), "print('hi')".to_string()])
+            .is_err());
     }
 
     #[test]
@@ -644,7 +680,9 @@ mod tests {
             always_allowed: Some(overlay_set),
             ..AllowlistOverlay::default()
         };
-        let merged = base.apply_overlay(&overlay).expect("narrowing should succeed");
+        let merged = base
+            .apply_overlay(&overlay)
+            .expect("narrowing should succeed");
         assert!(merged.always_allowed.contains("git"));
         assert!(!merged.always_allowed.contains("make"));
     }
@@ -773,36 +811,46 @@ mod tests {
         let mut config = AllowlistConfig::secure_default();
 
         // Add a command with restrictions
-        config.conditionally_allowed.insert("test_cmd".to_string(), CommandRestrictions {
-            max_args: Some(2),
-            required_args: vec!["--required".to_string()],
-            forbidden_args: vec!["--forbidden".to_string()],
-            allowed_patterns: vec![],
-            forbidden_patterns: vec![],
-            requires_elevation: false,
-            custom_validator: None,
-        });
+        config.conditionally_allowed.insert(
+            "test_cmd".to_string(),
+            CommandRestrictions {
+                max_args: Some(2),
+                required_args: vec!["--required".to_string()],
+                forbidden_args: vec!["--forbidden".to_string()],
+                allowed_patterns: vec![],
+                forbidden_patterns: vec![],
+                requires_elevation: false,
+                custom_validator: None,
+            },
+        );
 
         // Should reject too many args
-        assert!(config.validate_command("test_cmd", &[
-            "arg1".to_string(),
-            "arg2".to_string(),
-            "arg3".to_string()
-        ]).is_err());
+        assert!(config
+            .validate_command(
+                "test_cmd",
+                &["arg1".to_string(), "arg2".to_string(), "arg3".to_string()]
+            )
+            .is_err());
 
         // Should reject missing required arg
-        assert!(config.validate_command("test_cmd", &["arg1".to_string()]).is_err());
+        assert!(config
+            .validate_command("test_cmd", &["arg1".to_string()])
+            .is_err());
 
         // Should reject forbidden arg
-        assert!(config.validate_command("test_cmd", &[
-            "--required".to_string(),
-            "--forbidden".to_string()
-        ]).is_err());
+        assert!(config
+            .validate_command(
+                "test_cmd",
+                &["--required".to_string(), "--forbidden".to_string()]
+            )
+            .is_err());
 
         // Should accept valid args
-        assert!(config.validate_command("test_cmd", &[
-            "--required".to_string(),
-            "valid_arg".to_string()
-        ]).is_ok());
+        assert!(config
+            .validate_command(
+                "test_cmd",
+                &["--required".to_string(), "valid_arg".to_string()]
+            )
+            .is_ok());
     }
 }

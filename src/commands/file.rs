@@ -1,6 +1,7 @@
 // file: src/commands/file.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: fbdd6298-852d-4041-a846-83781ff68a50
+// last-edited: 2026-10-04
 
 //! File operations: read, write, glob, list, exists.
 //!
@@ -36,66 +37,88 @@ pub fn build_command() -> Command {
         .subcommand(
             Command::new("read")
                 .about("Read a file to stdout")
-                .arg(Arg::new("path")
-                    .long("path")
-                    .help("File to read")
-                    .required(true))
-                .arg(Arg::new("max-bytes")
-                    .long("max-bytes")
-                    .help("Maximum bytes to read (default 10 MiB)")
-                    .value_parser(clap::value_parser!(u64))),
+                .arg(
+                    Arg::new("path")
+                        .long("path")
+                        .help("File to read")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("max-bytes")
+                        .long("max-bytes")
+                        .help("Maximum bytes to read (default 10 MiB)")
+                        .value_parser(clap::value_parser!(u64)),
+                ),
         )
         .subcommand(
             Command::new("write")
                 .about("Write content to a file (creates or overwrites)")
-                .arg(Arg::new("path")
-                    .long("path")
-                    .help("File to write")
-                    .required(true))
-                .arg(Arg::new("content")
-                    .long("content")
-                    .help("Inline content (mutually exclusive with --content-stdin)")
-                    .conflicts_with("content-stdin"))
-                .arg(Arg::new("content-stdin")
-                    .long("content-stdin")
-                    .help("Read content from stdin (use for any non-trivial size)")
-                    .action(clap::ArgAction::SetTrue))
-                .arg(Arg::new("create-dirs")
-                    .long("create-dirs")
-                    .help("Create parent directories if missing")
-                    .action(clap::ArgAction::SetTrue))
-                .arg(Arg::new("max-bytes")
-                    .long("max-bytes")
-                    .help("Maximum bytes to write (default 5 MiB)")
-                    .value_parser(clap::value_parser!(u64))),
+                .arg(
+                    Arg::new("path")
+                        .long("path")
+                        .help("File to write")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("content")
+                        .long("content")
+                        .help("Inline content (mutually exclusive with --content-stdin)")
+                        .conflicts_with("content-stdin"),
+                )
+                .arg(
+                    Arg::new("content-stdin")
+                        .long("content-stdin")
+                        .help("Read content from stdin (use for any non-trivial size)")
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("create-dirs")
+                        .long("create-dirs")
+                        .help("Create parent directories if missing")
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("max-bytes")
+                        .long("max-bytes")
+                        .help("Maximum bytes to write (default 5 MiB)")
+                        .value_parser(clap::value_parser!(u64)),
+                ),
         )
         .subcommand(
             Command::new("glob")
                 .about("Match files against a glob pattern, one per line")
-                .arg(Arg::new("pattern")
-                    .long("pattern")
-                    .help("Glob pattern, e.g. 'src/**/*.rs'")
-                    .required(true))
-                .arg(Arg::new("max-results")
-                    .long("max-results")
-                    .help("Maximum results to return (default 5000)")
-                    .value_parser(clap::value_parser!(usize))),
+                .arg(
+                    Arg::new("pattern")
+                        .long("pattern")
+                        .help("Glob pattern, e.g. 'src/**/*.rs'")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("max-results")
+                        .long("max-results")
+                        .help("Maximum results to return (default 5000)")
+                        .value_parser(clap::value_parser!(usize)),
+                ),
         )
         .subcommand(
             Command::new("list")
                 .about("List directory entries (non-recursive), one per line")
-                .arg(Arg::new("path")
-                    .long("path")
-                    .help("Directory to list")
-                    .required(true)),
+                .arg(
+                    Arg::new("path")
+                        .long("path")
+                        .help("Directory to list")
+                        .required(true),
+                ),
         )
         .subcommand(
             Command::new("exists")
                 .about("Exit 0 if path exists, 1 otherwise")
-                .arg(Arg::new("path")
-                    .long("path")
-                    .help("Path to test")
-                    .required(true)),
+                .arg(
+                    Arg::new("path")
+                        .long("path")
+                        .help("Path to test")
+                        .required(true),
+                ),
         )
 }
 
@@ -278,8 +301,16 @@ fn validate_path(path_str: &str, intent: PathIntent) -> Result<PathBuf> {
     if raw.is_absolute() {
         let s = raw.to_string_lossy();
         const SENSITIVE: &[&str] = &[
-            "/etc", "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/boot", "/root",
-            "/sys", "/proc", "/dev",
+            "/etc",
+            "/bin",
+            "/sbin",
+            "/usr/bin",
+            "/usr/sbin",
+            "/boot",
+            "/root",
+            "/sys",
+            "/proc",
+            "/dev",
         ];
         for prefix in SENSITIVE {
             if s.starts_with(prefix) {
@@ -294,7 +325,10 @@ fn validate_path(path_str: &str, intent: PathIntent) -> Result<PathBuf> {
     let resolved = if let Ok(root_str) = env::var("SAFE_AI_UTIL_REPO_ROOT") {
         let root = PathBuf::from(&root_str);
         let root_canon = fs::canonicalize(&root).with_context(|| {
-            format!("file: SAFE_AI_UTIL_REPO_ROOT '{}' is not accessible", root_str)
+            format!(
+                "file: SAFE_AI_UTIL_REPO_ROOT '{}' is not accessible",
+                root_str
+            )
         })?;
 
         let candidate = if raw.is_absolute() {
@@ -305,7 +339,10 @@ fn validate_path(path_str: &str, intent: PathIntent) -> Result<PathBuf> {
 
         let canon = match intent {
             PathIntent::Read => fs::canonicalize(&candidate).with_context(|| {
-                format!("file: cannot resolve '{}' under repo root", candidate.display())
+                format!(
+                    "file: cannot resolve '{}' under repo root",
+                    candidate.display()
+                )
             })?,
             PathIntent::Write => canonicalize_for_write(&candidate)?,
         };
@@ -331,7 +368,12 @@ fn canonicalize_for_write(p: &Path) -> Result<PathBuf> {
     }
     let mut probe = p
         .parent()
-        .ok_or_else(|| anyhow!("file write: target '{}' has no parent component", p.display()))?
+        .ok_or_else(|| {
+            anyhow!(
+                "file write: target '{}' has no parent component",
+                p.display()
+            )
+        })?
         .to_path_buf();
     let mut suffix: Vec<std::ffi::OsString> = Vec::new();
     loop {
@@ -348,7 +390,12 @@ fn canonicalize_for_write(p: &Path) -> Result<PathBuf> {
         }
         let comp = probe
             .file_name()
-            .ok_or_else(|| anyhow!("file write: unable to resolve any ancestor of '{}'", p.display()))?
+            .ok_or_else(|| {
+                anyhow!(
+                    "file write: unable to resolve any ancestor of '{}'",
+                    p.display()
+                )
+            })?
             .to_owned();
         suffix.push(comp);
         if !probe.pop() {
@@ -443,8 +490,7 @@ mod tests {
         let outside_file = outside.path().join("evil.txt");
         fs::write(&outside_file, "x").unwrap();
         with_repo_root(&td, |_| {
-            let err = validate_path(outside_file.to_str().unwrap(), PathIntent::Read)
-                .unwrap_err();
+            let err = validate_path(outside_file.to_str().unwrap(), PathIntent::Read).unwrap_err();
             assert!(err.to_string().contains("escapes repo root"));
         });
     }
@@ -462,8 +508,7 @@ mod tests {
     fn write_to_new_file_in_new_subdir_resolves() {
         let td = TempDir::new().unwrap();
         with_repo_root(&td, |_| {
-            let resolved =
-                validate_path("sub/dir/file.txt", PathIntent::Write).unwrap();
+            let resolved = validate_path("sub/dir/file.txt", PathIntent::Write).unwrap();
             assert!(resolved.to_string_lossy().contains("file.txt"));
         });
     }
