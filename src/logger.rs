@@ -1,6 +1,7 @@
 // file: src/logger.rs
-// version: 1.3.0
+// version: 1.3.1
 // guid: 5a9fbb43-1e0b-4bea-a858-b74b58176503
+// last-edited: 2026-10-04
 
 use crate::error::Result;
 use chrono;
@@ -22,7 +23,10 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 ///     file. Defaults to `./logs/` (legacy behavior) when unset.
 ///   * `RUST_LOG=<filter>` — standard tracing filter, applied to both layers.
 pub fn setup_logging() -> Result<()> {
-    if env::var("SAFE_AI_UTIL_QUIET").map(|v| v != "0" && !v.is_empty()).unwrap_or(false) {
+    if env::var("SAFE_AI_UTIL_QUIET")
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false)
+    {
         return setup_quiet_logging();
     }
 

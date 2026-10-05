@@ -1,6 +1,7 @@
 // file: src/main.rs
-// version: 2.3.0
+// version: 2.3.1
 // guid: 9dc55dfd-921c-4db5-84e1-fbccd6b03a6b
+// last-edited: 2026-10-04
 
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
@@ -40,16 +41,15 @@ async fn main() -> Result<()> {
     let app = build_cli();
     let matches = app.get_matches();
 
-    let explicit_config = matches.get_one::<String>("config").map(std::path::PathBuf::from);
+    let explicit_config = matches
+        .get_one::<String>("config")
+        .map(std::path::PathBuf::from);
     let overlay_path = matches
         .get_one::<String>("policy-overlay")
         .map(std::path::PathBuf::from);
 
-    let config = Config::load_with_paths(
-        explicit_config.as_deref(),
-        overlay_path.as_deref(),
-    )
-    .await?;
+    let config =
+        Config::load_with_paths(explicit_config.as_deref(), overlay_path.as_deref()).await?;
 
     // Create executor with config
     let executor = Executor::new(config).await?;

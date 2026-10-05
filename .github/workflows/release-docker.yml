@@ -1,6 +1,7 @@
 # file: .github/workflows/release-docker.yml
-# version: 1.0.4
+# version: 1.1.0
 # guid: a4b5c6d7-e8f9-0a1b-2c3d-4e5f6a7b8c9d
+# last-edited: 2026-10-04
 
 name: Docker Release Build
 
@@ -30,6 +31,8 @@ permissions:
   packages: write
   security-events: write
   attestations: write
+  # actions/attest-sbom signs with a Sigstore OIDC token.
+  id-token: write
 
 jobs:
   # Docker matrix build with all our improvements from matrix-build.yml
@@ -40,7 +43,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.docker-matrix) }}
     outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
+      # Only the primary leg publishes its digest. Every leg pushes, and a
+      # matrix output is otherwise whichever leg finished last, so the
+      # security job could be handed an arm64 image to run on an amd64 runner.
+      image-digest: ${{ steps.primary-digest.outputs.digest }}
       image-tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
@@ -124,6 +130,11 @@ jobs:
           provenance: true
           sbom: true
 
+      - name: Publish primary image digest
+        id: primary-digest
+        if: matrix.primary
+        run: echo "digest=${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
   # Docker security scanning and testing
   docker-security:
     name: Docker Security & Testing
@@ -152,17 +163,27 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Generate SBOM
+        env:
+          IMAGE_DIGEST: ${{ needs.build-docker.outputs.image-digest }}
         run: |
-          IMAGE_REF="${{ inputs.registry }}/${{ inputs.image-name }}:${{ github.sha }}"
+          # Reference the image by the digest the primary build pushed. No tag
+          # equal to the commit SHA is ever pushed, so a ":<sha>" reference
+          # cannot resolve.
+          if [ -z "$IMAGE_DIGEST" ]; then
+            echo "::error::build-docker published no primary image digest"
+            exit 1
+          fi
+          IMAGE_REF="${{ inputs.registry }}/${{ inputs.image-name }}@${IMAGE_DIGEST}"
+          echo "IMAGE_REF=$IMAGE_REF" >> "$GITHUB_ENV"
           echo "Generating SBOM for: $IMAGE_REF"
-          syft "$IMAGE_REF" -o spdx-json=sbom.spdx.json || echo "SBOM generation completed with warnings"
+          syft "$IMAGE_REF" --platform linux/amd64 -o spdx-json=sbom.spdx.json
 
       - name: Test image functionality
         run: |
-          IMAGE_REF="${{ inputs.registry }}/${{ inputs.image-name }}:${{ github.sha }}"
           echo "Testing image functionality: $IMAGE_REF"
-          # Basic smoke test
-          docker run --rm "$IMAGE_REF" --help || echo "Image smoke test completed"
+          docker run --rm --platform linux/amd64 "$IMAGE_REF" --version
+          # The image's default command.
+          docker run --rm --platform linux/amd64 "$IMAGE_REF"
 
       - name: Validate Docker Compose files
         run: |

@@ -1,6 +1,7 @@
 # file: Dockerfile
-# version: 1.0.0
+# version: 1.0.1
 # guid: 2b3c4d5e-6f7a-8901-bcde-f23456789012
+# last-edited: 2026-10-04
 
 # Multi-stage build for optimized Rust binary
 FROM rust:1.98-slim as builder
@@ -56,6 +57,11 @@ COPY --from=builder /etc/group /etc/group
 
 # Copy the binary
 COPY --from=builder /app/target/release/copilot-agent-util /usr/local/bin/copilot-agent-util
+
+# The working directory must be writable by the runtime user: the binary
+# creates ./logs at startup, and a root-owned WORKDIR made every invocation,
+# including the default --help, exit with "Permission denied".
+RUN install -d -o appuser -g appuser /workspace
 
 # Use an unprivileged user
 USER appuser:appuser

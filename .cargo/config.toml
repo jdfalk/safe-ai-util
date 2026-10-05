@@ -1,6 +1,7 @@
-# file: tools/copilot-agent-util-rust/.cargo/config.toml
-# version: 1.1.0
+# file: .cargo/config.toml
+# version: 1.2.0
 # guid: b2c3d4e5-f6a7-8901-bcde-f23456789012
+# last-edited: 2026-10-04
 
 [build]
 target-dir = "target"
@@ -13,3 +14,10 @@ linker = "rust-lld"
 
 [target.aarch64-unknown-linux-musl]
 linker = "rust-lld"
+
+# Cross-linking aarch64 glibc from an x86_64 host needs the aarch64 GCC driver
+# (apt: gcc-aarch64-linux-gnu, installed by release-rust.yml). Without this,
+# cargo falls back to the host `cc`, which hands the aarch64-only
+# --fix-cortex-a53-843419 flag to an x86_64 lld and fails.
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"

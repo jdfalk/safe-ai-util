@@ -1,6 +1,7 @@
 // file: src/commands/awk.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: 9b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::{anyhow, Result};
@@ -15,28 +16,34 @@ use std::path::Path;
 pub fn build_command() -> Command {
     Command::new("awk")
         .about("Pattern scanning and processing language (Rust implementation)")
-        .arg(Arg::new("program")
-            .help("AWK program text")
-            .required(true))
-        .arg(Arg::new("file")
-            .help("Input files")
-            .action(clap::ArgAction::Append))
-        .arg(Arg::new("field-separator")
-            .help("Field separator")
-            .short('F')
-            .long("field-separator")
-            .value_name("FS"))
-        .arg(Arg::new("assign")
-            .help("Variable assignment")
-            .short('v')
-            .long("assign")
-            .action(clap::ArgAction::Append)
-            .value_name("VAR=VALUE"))
-        .arg(Arg::new("file-program")
-            .help("Read program from file")
-            .short('f')
-            .long("file")
-            .value_name("PROGFILE"))
+        .arg(Arg::new("program").help("AWK program text").required(true))
+        .arg(
+            Arg::new("file")
+                .help("Input files")
+                .action(clap::ArgAction::Append),
+        )
+        .arg(
+            Arg::new("field-separator")
+                .help("Field separator")
+                .short('F')
+                .long("field-separator")
+                .value_name("FS"),
+        )
+        .arg(
+            Arg::new("assign")
+                .help("Variable assignment")
+                .short('v')
+                .long("assign")
+                .action(clap::ArgAction::Append)
+                .value_name("VAR=VALUE"),
+        )
+        .arg(
+            Arg::new("file-program")
+                .help("Read program from file")
+                .short('f')
+                .long("file")
+                .value_name("PROGFILE"),
+        )
 }
 
 /// Execute awk commands with Rust-native implementation
@@ -44,19 +51,24 @@ pub async fn execute(matches: &ArgMatches, _executor: &Executor) -> Result<()> {
     let program_text = if let Some(prog_file) = matches.get_one::<String>("file-program") {
         fs::read_to_string(prog_file)?
     } else {
-        matches.get_one::<String>("program")
+        matches
+            .get_one::<String>("program")
             .ok_or_else(|| anyhow!("No AWK program provided"))?
             .clone()
     };
 
-    let files: Vec<_> = matches.get_many::<String>("file")
+    let files: Vec<_> = matches
+        .get_many::<String>("file")
         .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
-    let field_separator = matches.get_one::<String>("field-separator").cloned()
+    let field_separator = matches
+        .get_one::<String>("field-separator")
+        .cloned()
         .unwrap_or_else(|| " ".to_string());
 
-    let assignments = matches.get_many::<String>("assign")
+    let assignments = matches
+        .get_many::<String>("assign")
         .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
@@ -145,7 +157,7 @@ struct AwkContext {
     fnr: usize, // File record number
     nf: usize,  // Number of fields
     filename: String,
-    fs: String, // Field separator
+    fs: String,  // Field separator
     ofs: String, // Output field separator
     ors: String, // Output record separator
     rs: String,  // Record separator
@@ -343,7 +355,7 @@ fn parse_action(action_text: &str) -> Result<AwkAction> {
     let trimmed = action_text.trim();
 
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        let inner = &trimmed[1..trimmed.len()-1].trim();
+        let inner = &trimmed[1..trimmed.len() - 1].trim();
 
         // Simple parsing - just handle basic statements
         if inner.is_empty() || *inner == "print" {
@@ -408,11 +420,7 @@ fn process_input(
 }
 
 /// Check if pattern matches current record
-fn match_pattern(
-    pattern: &Option<AwkPattern>,
-    context: &AwkContext,
-    line: &str,
-) -> Result<bool> {
+fn match_pattern(pattern: &Option<AwkPattern>, context: &AwkContext, line: &str) -> Result<bool> {
     match pattern {
         None => Ok(true), // No pattern means always match
         Some(AwkPattern::Expression(expr)) => {
@@ -452,7 +460,7 @@ fn evaluate_expression(expr: &str, context: &AwkContext, line: &str) -> Result<b
 
     // Handle regex patterns
     if expr.starts_with('/') && expr.ends_with('/') {
-        let pattern = &expr[1..expr.len()-1];
+        let pattern = &expr[1..expr.len() - 1];
         let regex = Regex::new(pattern)?;
         return Ok(regex.is_match(line));
     }
@@ -492,11 +500,7 @@ fn evaluate_field_or_variable(expr: &str, context: &AwkContext) -> Result<String
 }
 
 /// Execute AWK action
-fn execute_action(
-    action: &AwkAction,
-    context: &mut AwkContext,
-    _fields: &[String],
-) -> Result<()> {
+fn execute_action(action: &AwkAction, context: &mut AwkContext, _fields: &[String]) -> Result<()> {
     match action {
         AwkAction::Print(None) => {
             println!("{}", context.get_field(0));
@@ -535,7 +539,7 @@ fn evaluate_print_expression(expr: &str, context: &AwkContext) -> Result<String>
 
     // Handle string literals
     if expr.starts_with('"') && expr.ends_with('"') {
-        return Ok(expr[1..expr.len()-1].to_string());
+        return Ok(expr[1..expr.len() - 1].to_string());
     }
 
     // Handle concatenation (simplified)

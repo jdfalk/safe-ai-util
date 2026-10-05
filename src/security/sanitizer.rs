@@ -1,6 +1,7 @@
 // file: src/security/sanitizer.rs
-// version: 1.0.0
+// version: 1.0.1
 // guid: b2c3d4e5-f6a7-8901-bcde-f23456789012
+// last-edited: 2026-10-04
 
 //! Argument sanitization module
 //!
@@ -58,7 +59,8 @@ fn sanitize_git_argument(arg: &str) -> Result<String> {
     ];
 
     for pattern in &dangerous_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Git argument contains dangerous pattern '{}': {}",
@@ -71,10 +73,7 @@ fn sanitize_git_argument(arg: &str) -> Result<String> {
     let clean = arg
         .chars()
         .filter(|c| {
-            c.is_alphanumeric()
-                || " -_.:/=@#[](){}^~".contains(*c)
-                || *c == '\''
-                || *c == '"'
+            c.is_alphanumeric() || " -_.:/=@#[](){}^~".contains(*c) || *c == '\'' || *c == '"'
         })
         .collect::<String>();
 
@@ -110,7 +109,8 @@ fn sanitize_cargo_argument(arg: &str) -> Result<String> {
     ];
 
     for pattern in &dangerous_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Cargo argument contains dangerous pattern '{}': {}",
@@ -157,7 +157,8 @@ fn sanitize_docker_argument(arg: &str) -> Result<String> {
     ];
 
     for pattern in &dangerous_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Docker argument contains dangerous pattern '{}': {}",
@@ -189,7 +190,8 @@ fn sanitize_node_argument(arg: &str) -> Result<String> {
     ];
 
     for pattern in &dangerous_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Node argument contains dangerous pattern '{}': {}",
@@ -224,7 +226,8 @@ fn sanitize_python_argument(arg: &str) -> Result<String> {
     ];
 
     for pattern in &dangerous_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Python argument contains dangerous pattern '{}': {}",
@@ -297,7 +300,8 @@ fn check_for_injection_patterns(arg: &str) -> Result<()> {
     ];
 
     for pattern in &injection_patterns {
-        let regex = Regex::new(pattern).map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
+        let regex = Regex::new(pattern)
+            .map_err(|e| AgentError::validation(format!("Regex error: {}", e)))?;
         if regex.is_match(arg) {
             return Err(AgentError::security(format!(
                 "Argument contains dangerous injection pattern '{}': {}",
@@ -353,8 +357,11 @@ mod tests {
         ];
 
         for input in &dangerous_inputs {
-            assert!(check_for_injection_patterns(input).is_err(),
-                   "Should reject dangerous input: {}", input);
+            assert!(
+                check_for_injection_patterns(input).is_err(),
+                "Should reject dangerous input: {}",
+                input
+            );
         }
     }
 

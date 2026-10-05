@@ -1,6 +1,7 @@
 // file: src/security/audit.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: d4e5f6a7-b8c9-0123-def4-456789012345
+// last-edited: 2026-10-04
 
 //! Security audit logging module
 //!
@@ -150,9 +151,7 @@ fn capture_environment_summary() -> EnvironmentSummary {
         "PYTHONPATH",
     ];
 
-    let has_suspicious_vars = suspicious_vars
-        .iter()
-        .any(|var| std::env::var(var).is_ok());
+    let has_suspicious_vars = suspicious_vars.iter().any(|var| std::env::var(var).is_ok());
 
     let shell = std::env::var("SHELL").ok();
 
@@ -269,10 +268,9 @@ pub fn cleanup_old_audit_logs() -> std::io::Result<()> {
                     if let Ok(metadata) = std::fs::metadata(&path) {
                         if let Ok(modified) = metadata.modified() {
                             let modified_datetime: DateTime<Utc> = modified.into();
-                            if modified_datetime < cutoff
-                                && std::fs::remove_file(&path).is_ok() {
-                                    removed_count += 1;
-                                }
+                            if modified_datetime < cutoff && std::fs::remove_file(&path).is_ok() {
+                                removed_count += 1;
+                            }
                         }
                     }
                 }
@@ -299,7 +297,10 @@ pub fn initialize_audit_system() -> std::io::Result<()> {
     // Clean up old logs
     cleanup_old_audit_logs()?;
 
-    info!("Security audit system initialized. Logs: {}", log_dir.display());
+    info!(
+        "Security audit system initialized. Logs: {}",
+        log_dir.display()
+    );
     Ok(())
 }
 

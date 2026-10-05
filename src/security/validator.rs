@@ -1,6 +1,7 @@
 // file: src/security/validator.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: c3d4e5f6-a7b8-9012-cdef-345678901234
+// last-edited: 2026-10-04
 
 //! Command validation module
 //!
@@ -38,9 +39,27 @@ fn validate_git_arguments(args: &[String]) -> Result<()> {
 
     // Allow only safe git subcommands
     let allowed_subcommands = [
-        "status", "add", "commit", "push", "pull", "fetch", "log", "diff",
-        "branch", "checkout", "merge", "rebase", "reset", "clean", "stash",
-        "tag", "remote", "config", "show", "blame", "cherry-pick",
+        "status",
+        "add",
+        "commit",
+        "push",
+        "pull",
+        "fetch",
+        "log",
+        "diff",
+        "branch",
+        "checkout",
+        "merge",
+        "rebase",
+        "reset",
+        "clean",
+        "stash",
+        "tag",
+        "remote",
+        "config",
+        "show",
+        "blame",
+        "cherry-pick",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -69,7 +88,9 @@ fn validate_git_reset_args(args: &[String]) -> Result<()> {
             warn!("Git reset --hard detected - potentially destructive operation");
             // Allow but log the warning
         }
-        if arg.starts_with("--") && !["--soft", "--mixed", "--hard", "--keep", "--merge"].contains(&arg.as_str()) {
+        if arg.starts_with("--")
+            && !["--soft", "--mixed", "--hard", "--keep", "--merge"].contains(&arg.as_str())
+        {
             return Err(AgentError::validation(format!(
                 "Unknown git reset option: {}",
                 arg
@@ -158,7 +179,10 @@ fn validate_git_remote_args(args: &[String]) -> Result<()> {
     let allowed_remote_ops = ["show", "get-url", "-v", "prune"];
 
     if !allowed_remote_ops.contains(&subcommand.as_str()) && !subcommand.starts_with("-") {
-        warn!("Git remote operation '{}' may modify remote configuration", subcommand);
+        warn!(
+            "Git remote operation '{}' may modify remote configuration",
+            subcommand
+        );
     }
 
     Ok(())
@@ -174,8 +198,8 @@ fn validate_buf_arguments(args: &[String]) -> Result<()> {
 
     // Allow only safe buf subcommands
     let allowed_subcommands = [
-        "generate", "lint", "format", "breaking", "build", "push", "export",
-        "mod", "dep", "registry", "config", "beta",
+        "generate", "lint", "format", "breaking", "build", "push", "export", "mod", "dep",
+        "registry", "config", "beta",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -198,9 +222,28 @@ fn validate_cargo_arguments(args: &[String]) -> Result<()> {
 
     // Allow only safe cargo subcommands
     let allowed_subcommands = [
-        "build", "check", "clean", "doc", "test", "bench", "update", "search",
-        "publish", "install", "uninstall", "add", "remove", "run", "fmt",
-        "clippy", "version", "help", "tree", "audit", "fix", "metadata",
+        "build",
+        "check",
+        "clean",
+        "doc",
+        "test",
+        "bench",
+        "update",
+        "search",
+        "publish",
+        "install",
+        "uninstall",
+        "add",
+        "remove",
+        "run",
+        "fmt",
+        "clippy",
+        "version",
+        "help",
+        "tree",
+        "audit",
+        "fix",
+        "metadata",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -253,8 +296,8 @@ fn validate_go_arguments(args: &[String]) -> Result<()> {
 
     // Allow only safe go subcommands
     let allowed_subcommands = [
-        "build", "run", "test", "mod", "get", "install", "clean", "doc",
-        "fmt", "generate", "list", "version", "env", "vet", "work",
+        "build", "run", "test", "mod", "get", "install", "clean", "doc", "fmt", "generate", "list",
+        "version", "env", "vet", "work",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -277,8 +320,8 @@ fn validate_docker_arguments(args: &[String]) -> Result<()> {
 
     // Allow only safe docker subcommands
     let allowed_subcommands = [
-        "build", "run", "ps", "images", "logs", "inspect", "version",
-        "info", "system", "network", "volume", "compose",
+        "build", "run", "ps", "images", "logs", "inspect", "version", "info", "system", "network",
+        "volume", "compose",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -301,18 +344,17 @@ fn validate_docker_run_args(args: &[String]) -> Result<()> {
     for arg in args {
         if arg == "--privileged" {
             return Err(AgentError::security(
-                "Docker --privileged mode is not allowed"
+                "Docker --privileged mode is not allowed",
             ));
         }
         if arg.starts_with("--user") && arg.contains("root") {
             warn!("Docker run as root user detected");
         }
-        if (arg.starts_with("--volume") || arg.starts_with("-v"))
-            && arg.contains(":/") {
-                return Err(AgentError::security(
-                    "Docker volume mount to root filesystem is not allowed"
-                ));
-            }
+        if (arg.starts_with("--volume") || arg.starts_with("-v")) && arg.contains(":/") {
+            return Err(AgentError::security(
+                "Docker volume mount to root filesystem is not allowed",
+            ));
+        }
     }
     Ok(())
 }
@@ -327,9 +369,9 @@ fn validate_node_arguments(args: &[String]) -> Result<()> {
 
     // Allow common npm/yarn operations
     let allowed_subcommands = [
-        "install", "ci", "test", "run", "build", "start", "dev", "lint",
-        "format", "audit", "outdated", "list", "info", "version", "help",
-        "add", "remove", "update", "upgrade", "check",
+        "install", "ci", "test", "run", "build", "start", "dev", "lint", "format", "audit",
+        "outdated", "list", "info", "version", "help", "add", "remove", "update", "upgrade",
+        "check",
     ];
 
     if !allowed_subcommands.contains(&subcommand.as_str()) {
@@ -345,12 +387,12 @@ fn validate_python_arguments(args: &[String]) -> Result<()> {
     for arg in args {
         if arg == "-c" || arg == "--command" {
             return Err(AgentError::security(
-                "Python -c flag is not allowed for security reasons"
+                "Python -c flag is not allowed for security reasons",
             ));
         }
         if arg.starts_with("-c") {
             return Err(AgentError::security(
-                "Python inline code execution is not allowed"
+                "Python inline code execution is not allowed",
             ));
         }
     }
@@ -373,8 +415,16 @@ fn validate_file_arguments(command: &str, args: &[String]) -> Result<()> {
         if path.is_absolute() {
             let path_str = path.to_string_lossy();
             let sensitive_paths = [
-                "/etc", "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/boot",
-                "/root", "/sys", "/proc", "/dev",
+                "/etc",
+                "/bin",
+                "/sbin",
+                "/usr/bin",
+                "/usr/sbin",
+                "/boot",
+                "/root",
+                "/sys",
+                "/proc",
+                "/dev",
             ];
 
             for sensitive in &sensitive_paths {
@@ -391,7 +441,7 @@ fn validate_file_arguments(command: &str, args: &[String]) -> Result<()> {
         if command == "rm" {
             if arg == "/" || arg == "/*" {
                 return Err(AgentError::security(
-                    "Deletion of root filesystem is not allowed"
+                    "Deletion of root filesystem is not allowed",
                 ));
             }
             if arg.contains("*") && arg.len() < 5 {
@@ -409,7 +459,7 @@ fn validate_generic_arguments(args: &[String]) -> Result<()> {
     for arg in args {
         if arg.len() > 1000 {
             return Err(AgentError::validation(
-                "Argument too long (> 1000 characters)"
+                "Argument too long (> 1000 characters)",
             ));
         }
     }
@@ -439,8 +489,13 @@ mod tests {
         assert!(validate_python_arguments(&["-m".to_string(), "pytest".to_string()]).is_ok());
 
         // Dangerous operations
-        assert!(validate_python_arguments(&["-c".to_string(), "print('hello')".to_string()]).is_err());
-        assert!(validate_python_arguments(&["--command".to_string(), "exec('evil')".to_string()]).is_err());
+        assert!(
+            validate_python_arguments(&["-c".to_string(), "print('hello')".to_string()]).is_err()
+        );
+        assert!(
+            validate_python_arguments(&["--command".to_string(), "exec('evil')".to_string()])
+                .is_err()
+        );
     }
 
     #[test]
@@ -461,7 +516,9 @@ mod tests {
         assert!(validate_docker_arguments(&["images".to_string()]).is_ok());
 
         // Dangerous operations
-        assert!(validate_docker_arguments(&["run".to_string(), "--privileged".to_string()]).is_err());
+        assert!(
+            validate_docker_arguments(&["run".to_string(), "--privileged".to_string()]).is_err()
+        );
         assert!(validate_docker_arguments(&["exec".to_string()]).is_err());
     }
 }

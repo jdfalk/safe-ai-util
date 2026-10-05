@@ -1,6 +1,7 @@
 // file: src/commands/prettier.rs
-// version: 1.0.1
+// version: 1.0.2
 // guid: f3b23e72-ff46-4cdd-bba2-9f14cede3837
+// last-edited: 2026-10-04
 
 use crate::executor::Executor;
 use anyhow::Result;
@@ -316,7 +317,7 @@ async fn execute_prettier(matches: &ArgMatches, executor: &Executor) -> Result<(
     info!("Running Prettier on: {}", path);
     match args.first() {
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
-        None => anyhow::bail!("No command specified")
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -333,11 +334,9 @@ async fn execute_black(matches: &ArgMatches, executor: &Executor) -> Result<()> 
 
     info!("Running Black on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -357,11 +356,9 @@ async fn execute_isort(matches: &ArgMatches, executor: &Executor) -> Result<()> 
 
     info!("Running isort on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -374,11 +371,9 @@ async fn execute_rustfmt(matches: &ArgMatches, executor: &Executor) -> Result<()
 
     info!("Running rustfmt");
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -398,11 +393,9 @@ async fn execute_gofmt(matches: &ArgMatches, executor: &Executor) -> Result<()> 
 
     info!("Running gofmt on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -418,11 +411,9 @@ async fn execute_goimports(matches: &ArgMatches, executor: &Executor) -> Result<
 
     info!("Running goimports on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -438,11 +429,9 @@ async fn execute_buf_format(matches: &ArgMatches, executor: &Executor) -> Result
 
     info!("Running buf format on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -459,11 +448,9 @@ async fn execute_shfmt(matches: &ArgMatches, executor: &Executor) -> Result<()> 
 
     info!("Running shfmt on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -480,11 +467,9 @@ async fn execute_clang_format(matches: &ArgMatches, executor: &Executor) -> Resu
 
     info!("Running clang-format on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -497,11 +482,9 @@ async fn execute_yaml_format(matches: &ArgMatches, executor: &Executor) -> Resul
 
     info!("Running YAML format on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -514,11 +497,9 @@ async fn execute_json_format(matches: &ArgMatches, executor: &Executor) -> Resul
 
     info!("Running JSON format on: {}", path);
     match args.first() {
-
         Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
 
-        None => anyhow::bail!("No command specified")
-
+        None => anyhow::bail!("No command specified"),
     }
 }
 
@@ -576,9 +557,9 @@ async fn execute_all_formatters(matches: &ArgMatches, executor: &Executor) -> Re
     for (name, args) in formatters {
         info!("Running {}", name);
         match match args.first() {
-     Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
-     None => anyhow::bail!("No command specified")
- } {
+            Some(cmd) => executor.execute_secure(cmd, &args[1..]).await,
+            None => anyhow::bail!("No command specified"),
+        } {
             Ok(_) => info!("{}: ✅ Formatted", name),
             Err(e) => {
                 debug!("{}: ❌ Failed: {}", name, e);

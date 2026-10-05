@@ -1,10 +1,11 @@
 // file: src/executor.rs
-// version: 2.1.0
+// version: 2.1.1
 // guid: bb371682-35cb-4f34-b318-8bf69ec125bd
+// last-edited: 2026-10-04
 
 use crate::config::Config;
-use crate::security::{SecurityManager, audit};
 use crate::error::{AgentError, Result};
+use crate::security::{audit, SecurityManager};
 use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
@@ -36,21 +37,33 @@ impl Executor {
             }
         };
 
-        info!("Security stats: {} commands allowed", security.get_allowed_commands().len());
+        info!(
+            "Security stats: {} commands allowed",
+            security.get_allowed_commands().len()
+        );
 
         Ok(Self { config, security })
     }
 
     /// Execute a command with full security validation
-    pub async fn execute_secure<T: AsRef<str>>(&self, command: &str, args: &[T]) -> anyhow::Result<()> {
+    pub async fn execute_secure<T: AsRef<str>>(
+        &self,
+        command: &str,
+        args: &[T],
+    ) -> anyhow::Result<()> {
         // Validate execution context first
-        self.security.validate_execution_context().map_err(|e| anyhow::anyhow!("{}", e))?;
+        self.security
+            .validate_execution_context()
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         // Convert args to String vector for security validation
         let string_args: Vec<String> = args.iter().map(|s| s.as_ref().to_string()).collect();
 
         // Validate and sanitize the command and arguments
-        let sanitized_args = self.security.validate_arguments(command, &string_args).map_err(|e| anyhow::anyhow!("{}", e))?;
+        let sanitized_args = self
+            .security
+            .validate_arguments(command, &string_args)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         info!(
             "Executing secure command: {} with sanitized args: {:?}",
@@ -71,11 +84,16 @@ impl Executor {
         }
 
         // Execute command with security monitoring
-        self.execute_command_impl(command, &sanitized_args).await.map_err(|e| anyhow::anyhow!("{}", e))
+        self.execute_command_impl(command, &sanitized_args)
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Execute a raw command with arguments (DEPRECATED - use execute_secure instead)
-    #[deprecated(since = "2.0.0", note = "Use execute_secure instead for better security")]
+    #[deprecated(
+        since = "2.0.0",
+        note = "Use execute_secure instead for better security"
+    )]
     pub async fn execute_raw(&self, args: &[&str]) -> Result<()> {
         warn!("DEPRECATED: execute_raw called - consider migrating to execute_secure");
 
@@ -87,7 +105,8 @@ impl Executor {
         let string_args: Vec<String> = args[1..].iter().map(|s| s.to_string()).collect();
 
         // Route through secure execution
-        self.execute_secure(command, &string_args).await
+        self.execute_secure(command, &string_args)
+            .await
             .map_err(|e| AgentError::execution(e.to_string()))
     }
 
@@ -110,17 +129,14 @@ impl Executor {
         // Execute with timeout
         let status = tokio::time::timeout(
             std::time::Duration::from_secs(self.config.general.timeout_seconds),
-            cmd.status()
+            cmd.status(),
         )
         .await
         .map_err(|_| AgentError::timeout("Command execution timed out"))?
         .map_err(|e| AgentError::execution(format!("Failed to execute command: {}", e)))?;
 
         if !status.success() {
-            let error_msg = format!(
-                "Command failed with exit code: {:?}",
-                status.code()
-            );
+            let error_msg = format!("Command failed with exit code: {:?}", status.code());
             audit::log_security_violation(command, args, &error_msg);
             return Err(AgentError::execution(error_msg));
         }
@@ -170,7 +186,7 @@ impl Executor {
                 warn!("Skipping suspicious PATH entry: {}", entry);
                 audit::log_suspicious_activity(
                     "Suspicious PATH entry detected",
-                    &[entry.to_string()]
+                    &[entry.to_string()],
                 );
                 continue;
             }

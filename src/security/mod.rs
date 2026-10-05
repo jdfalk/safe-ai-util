@@ -1,6 +1,7 @@
 // file: src/security/mod.rs
-// version: 1.1.0
+// version: 1.1.1
 // guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+// last-edited: 2026-10-04
 
 //! Security module for the Copilot Agent Utility
 //!
@@ -8,9 +9,9 @@
 //! for remote code execution or other malicious activities.
 
 pub mod allowlist;
+pub mod audit;
 pub mod sanitizer;
 pub mod validator;
-pub mod audit;
 
 use crate::error::{AgentError, Result};
 use allowlist::AllowlistConfig;
@@ -135,7 +136,10 @@ impl SecurityManager {
             if result {
                 info!("Security check PASSED for command: {}", command);
             } else {
-                warn!("Security check FAILED for command: {} (not in allowlist)", command);
+                warn!(
+                    "Security check FAILED for command: {} (not in allowlist)",
+                    command
+                );
             }
         }
 
@@ -149,9 +153,10 @@ impl SecurityManager {
     /// max-args caps) are applied in addition to the legacy sanitizer/validator.
     pub fn validate_arguments(&self, command: &str, args: &[String]) -> Result<Vec<String>> {
         if !self.is_command_allowed(command) {
-            return Err(AgentError::security(
-                format!("Command '{}' is not allowed for security reasons", command)
-            ));
+            return Err(AgentError::security(format!(
+                "Command '{}' is not allowed for security reasons",
+                command
+            )));
         }
 
         let sanitized_args = sanitizer::sanitize_arguments(command, args)?;
@@ -183,7 +188,9 @@ impl SecurityManager {
             if path.contains("..") || path.contains(";") || path.contains("&&") {
                 warn!("Suspicious PATH modification detected: {}", path);
                 if self.strict_mode {
-                    return Err(AgentError::security("Suspicious PATH detected in strict mode"));
+                    return Err(AgentError::security(
+                        "Suspicious PATH detected in strict mode",
+                    ));
                 }
             }
         }
@@ -194,14 +201,22 @@ impl SecurityManager {
     /// Enable or disable strict security mode
     pub fn set_strict_mode(&mut self, enabled: bool) {
         self.strict_mode = enabled;
-        info!("Strict security mode {}", if enabled { "enabled" } else { "disabled" });
+        info!(
+            "Strict security mode {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
     }
 
     /// Add a command to the allowlist (use with caution)
     pub fn add_allowed_command(&mut self, command: String) -> Result<()> {
         if self.strict_mode {
-            warn!("Attempt to add command '{}' in strict mode - rejected", command);
-            return Err(AgentError::security("Cannot modify allowlist in strict mode"));
+            warn!(
+                "Attempt to add command '{}' in strict mode - rejected",
+                command
+            );
+            return Err(AgentError::security(
+                "Cannot modify allowlist in strict mode",
+            ));
         }
 
         self.allowed_commands.insert(command.clone());
@@ -261,11 +276,15 @@ mod tests {
         let mut security = SecurityManager::new();
 
         // Should reject adding commands in strict mode
-        assert!(security.add_allowed_command("dangerous_command".to_string()).is_err());
+        assert!(security
+            .add_allowed_command("dangerous_command".to_string())
+            .is_err());
 
         // Disable strict mode and try again
         security.set_strict_mode(false);
-        assert!(security.add_allowed_command("dangerous_command".to_string()).is_ok());
+        assert!(security
+            .add_allowed_command("dangerous_command".to_string())
+            .is_ok());
         assert!(security.is_command_allowed("dangerous_command"));
     }
 
@@ -310,12 +329,12 @@ mod tests {
 
         // `make build` should pass.
         assert!(security
-            .validate_arguments("make", &vec!["build".to_string()])
+            .validate_arguments("make", &["build".to_string()])
             .is_ok());
 
         // `make clean` must be rejected by the rich policy.
         let err = security
-            .validate_arguments("make", &vec!["clean".to_string()])
+            .validate_arguments("make", &["clean".to_string()])
             .unwrap_err();
         let msg = err.to_string().to_lowercase();
         assert!(
