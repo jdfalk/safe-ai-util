@@ -275,56 +275,65 @@ impl AllowlistConfig {
     /// Add commands that are conditionally allowed
     fn add_conditional_commands(&mut self) {
         // Docker with restrictions
-        self.conditionally_allowed.insert("docker".to_string(), CommandRestrictions {
-            max_args: Some(20),
-            required_args: vec![],
-            forbidden_args: vec!["--privileged".to_string()],
-            allowed_patterns: vec![],
-            allowed_argv: vec![],
-            forbidden_patterns: vec![
-                r"--user.*root".to_string(),
-                r"--volume.*:/".to_string(),
-                r"--mount.*source=/".to_string(),
-            ],
-            requires_elevation: false,
-            custom_validator: Some("validate_docker".to_string()),
-        });
-
-        // Python with restrictions (no -c flag)
-        self.conditionally_allowed.insert("python".to_string(), CommandRestrictions {
-            max_args: Some(10),
-            required_args: vec![],
-            forbidden_args: vec!["-c".to_string(), "--command".to_string()],
-            allowed_patterns: vec![],
-            allowed_argv: vec![],
-            forbidden_patterns: vec![r"-c\s+".to_string()],
-            requires_elevation: false,
-            custom_validator: Some("validate_python".to_string()),
-        });
-
-        // File operations with restrictions
-        for cmd in &["cp", "mv", "rm", "mkdir", "rmdir"] {
-            self.conditionally_allowed.insert(cmd.to_string(), CommandRestrictions {
-                max_args: Some(100),
+        self.conditionally_allowed.insert(
+            "docker".to_string(),
+            CommandRestrictions {
+                max_args: Some(20),
                 required_args: vec![],
-                forbidden_args: vec![],
+                forbidden_args: vec!["--privileged".to_string()],
                 allowed_patterns: vec![],
                 allowed_argv: vec![],
                 forbidden_patterns: vec![
-                    r"^/etc/".to_string(),
-                    r"^/bin/".to_string(),
-                    r"^/sbin/".to_string(),
-                    r"^/usr/bin/".to_string(),
-                    r"^/usr/sbin/".to_string(),
-                    r"^/boot/".to_string(),
-                    r"^/root/".to_string(),
-                    r"^/sys/".to_string(),
-                    r"^/proc/".to_string(),
-                    r"^/dev/".to_string(),
+                    r"--user.*root".to_string(),
+                    r"--volume.*:/".to_string(),
+                    r"--mount.*source=/".to_string(),
                 ],
                 requires_elevation: false,
-                custom_validator: Some("validate_file_ops".to_string()),
-            });
+                custom_validator: Some("validate_docker".to_string()),
+            },
+        );
+
+        // Python with restrictions (no -c flag)
+        self.conditionally_allowed.insert(
+            "python".to_string(),
+            CommandRestrictions {
+                max_args: Some(10),
+                required_args: vec![],
+                forbidden_args: vec!["-c".to_string(), "--command".to_string()],
+                allowed_patterns: vec![],
+                allowed_argv: vec![],
+                forbidden_patterns: vec![r"-c\s+".to_string()],
+                requires_elevation: false,
+                custom_validator: Some("validate_python".to_string()),
+            },
+        );
+
+        // File operations with restrictions
+        for cmd in &["cp", "mv", "rm", "mkdir", "rmdir"] {
+            self.conditionally_allowed.insert(
+                cmd.to_string(),
+                CommandRestrictions {
+                    max_args: Some(100),
+                    required_args: vec![],
+                    forbidden_args: vec![],
+                    allowed_patterns: vec![],
+                    allowed_argv: vec![],
+                    forbidden_patterns: vec![
+                        r"^/etc/".to_string(),
+                        r"^/bin/".to_string(),
+                        r"^/sbin/".to_string(),
+                        r"^/usr/bin/".to_string(),
+                        r"^/usr/sbin/".to_string(),
+                        r"^/boot/".to_string(),
+                        r"^/root/".to_string(),
+                        r"^/sys/".to_string(),
+                        r"^/proc/".to_string(),
+                        r"^/dev/".to_string(),
+                    ],
+                    requires_elevation: false,
+                    custom_validator: Some("validate_file_ops".to_string()),
+                },
+            );
         }
     }
 
@@ -990,16 +999,19 @@ mod tests {
         let mut config = AllowlistConfig::secure_default();
 
         // Add a command with restrictions
-        config.conditionally_allowed.insert("test_cmd".to_string(), CommandRestrictions {
-            max_args: Some(2),
-            required_args: vec!["--required".to_string()],
-            forbidden_args: vec!["--forbidden".to_string()],
-            allowed_patterns: vec![],
-            allowed_argv: vec![],
-            forbidden_patterns: vec![],
-            requires_elevation: false,
-            custom_validator: None,
-        });
+        config.conditionally_allowed.insert(
+            "test_cmd".to_string(),
+            CommandRestrictions {
+                max_args: Some(2),
+                required_args: vec!["--required".to_string()],
+                forbidden_args: vec!["--forbidden".to_string()],
+                allowed_patterns: vec![],
+                allowed_argv: vec![],
+                forbidden_patterns: vec![],
+                requires_elevation: false,
+                custom_validator: None,
+            },
+        );
 
         // Should reject too many args
         assert!(config
@@ -1057,13 +1069,21 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(cfg.validate_command("zfs", &sv(&["list", "bigdata/sandbox"])).is_ok());
+        assert!(cfg
+            .validate_command("zfs", &sv(&["list", "bigdata/sandbox"]))
+            .is_ok());
         // Previously accepted: allowed_patterns was never checked.
-        assert!(cfg.validate_command("zfs", &sv(&["destroy", "bigdata/sandbox"])).is_err());
+        assert!(cfg
+            .validate_command("zfs", &sv(&["destroy", "bigdata/sandbox"]))
+            .is_err());
         // Anchoring: a prefix match is not enough.
-        assert!(cfg.validate_command("zfs", &sv(&["list; rm -rf /"])).is_err());
+        assert!(cfg
+            .validate_command("zfs", &sv(&["list; rm -rf /"]))
+            .is_err());
         assert!(cfg.validate_command("zfs", &sv(&["xlist"])).is_err());
-        assert!(cfg.validate_command("zfs", &sv(&["bigdata/sandbox/../../etc"])).is_err());
+        assert!(cfg
+            .validate_command("zfs", &sv(&["bigdata/sandbox/../../etc"]))
+            .is_err());
         // Alternation inside a pattern stays anchored as a whole.
         let cfg = single(
             "zfs",
@@ -1254,8 +1274,12 @@ mod tests {
         };
         let merged = base.apply_overlay(&overlay).unwrap();
         assert!(merged.validate_command("zfs", &sv(&["list"])).is_ok());
-        assert!(merged.validate_command("zfs", &sv(&["get", "all"])).is_err());
-        assert!(merged.validate_command("zfs", &sv(&["destroy", "x"])).is_err());
+        assert!(merged
+            .validate_command("zfs", &sv(&["get", "all"]))
+            .is_err());
+        assert!(merged
+            .validate_command("zfs", &sv(&["destroy", "x"]))
+            .is_err());
     }
 
     #[test]

@@ -4,9 +4,8 @@
 // last-edited: 2026-10-04
 
 use crate::config::Config;
-use crate::security::{SecurityManager, audit};
-use crate::security::elevation::ElevationContext;
 use crate::error::{AgentError, Result};
+use crate::security::elevation::ElevationContext;
 use crate::security::{audit, SecurityManager};
 use std::process::Stdio;
 use tokio::process::Command;

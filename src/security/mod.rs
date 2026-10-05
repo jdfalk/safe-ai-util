@@ -9,6 +9,7 @@
 //! for remote code execution or other malicious activities.
 
 pub mod allowlist;
+pub mod audit;
 pub mod elevation;
 pub mod fs_guard;
 pub mod root_policy;
@@ -66,8 +67,7 @@ impl SecurityManager {
     pub fn with_context(policy: Option<AllowlistConfig>, elevation: ElevationContext) -> Self {
         let allowed_commands = match &policy {
             Some(policy) => {
-                let mut allowed: HashSet<String> =
-                    policy.always_allowed.iter().cloned().collect();
+                let mut allowed: HashSet<String> = policy.always_allowed.iter().cloned().collect();
                 for key in policy.conditionally_allowed.keys() {
                     allowed.insert(key.clone());
                 }
@@ -389,8 +389,12 @@ mod tests {
         );
         let security =
             SecurityManager::with_context(Some(policy), ElevationContext::unprivileged(1000));
-        assert!(security.validate_arguments("make", &["build".to_string()]).is_ok());
-        assert!(security.validate_arguments("make", &["install".to_string()]).is_err());
+        assert!(security
+            .validate_arguments("make", &["build".to_string()])
+            .is_ok());
+        assert!(security
+            .validate_arguments("make", &["install".to_string()])
+            .is_err());
         assert!(security
             .validate_arguments("make", &["build".to_string(), "install".to_string()])
             .is_err());
@@ -399,8 +403,7 @@ mod tests {
     #[test]
     fn elevated_context_refuses_every_command() {
         for policy in [None, Some(AllowlistConfig::secure_default())] {
-            let security =
-                SecurityManager::with_context(policy, ElevationContext::sudo_root("u"));
+            let security = SecurityManager::with_context(policy, ElevationContext::sudo_root("u"));
             let err = security
                 .validate_arguments("git", &["status".to_string()])
                 .unwrap_err()
